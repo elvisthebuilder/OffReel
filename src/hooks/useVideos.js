@@ -1,11 +1,45 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const VAULT_STORAGE_KEY = '@offreel_vault_videos';
 
 export const useVideos = () => {
   const [videos, setVideos] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Execute once on load to fetch historically preserved user vault config
+  useEffect(() => {
+    const loadVault = async () => {
+      try {
+        const storedVideos = await AsyncStorage.getItem(VAULT_STORAGE_KEY);
+        if (storedVideos) {
+          setVideos(JSON.parse(storedVideos));
+        }
+      } catch (err) {
+        console.error('Failed to load vault from storage:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadVault();
+  }, []);
+
+  // Sync to database natively asynchronously when the state changes safely
+  useEffect(() => {
+    const saveVault = async () => {
+      try {
+        if (!loading) {
+          await AsyncStorage.setItem(VAULT_STORAGE_KEY, JSON.stringify(videos));
+        }
+      } catch (err) {
+        console.error('Failed to save vault to storage:', err);
+      }
+    };
+    saveVault();
+  }, [videos, loading]);
 
   const autoScanGallery = async () => {
     try {
@@ -33,7 +67,12 @@ export const useVideos = () => {
         filename: asset.filename || `Scanned Video ${index + 1}`,
       }));
 
-      setVideos(formattedAssets);
+      // Append instead of brutally overriding
+      setVideos(prev => {
+        const existingIds = new Set(prev.map(v => v.id));
+        const newUnique = formattedAssets.filter(v => !existingIds.has(v.id));
+        return [...prev, ...newUnique];
+      });
     } catch (err) {
       console.error('Error auto-scanning videos:', err);
       setError(err.message);
@@ -50,7 +89,7 @@ export const useVideos = () => {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Videos,
         allowsMultipleSelection: true,
-        selectionLimit: 20,
+        selectionLimit: 0, // 0 = unlimited globally securely
         quality: 1,
       });
 
@@ -60,7 +99,13 @@ export const useVideos = () => {
           uri: asset.uri,
           filename: asset.fileName || `Selected Video ${index + 1}`,
         }));
-        setVideos(pickedAssets);
+        
+        // Append accurately instead of brutally replacing existing vault
+        setVideos(prev => {
+          const existingIds = new Set(prev.map(v => v.id));
+          const newUnique = pickedAssets.filter(v => !existingIds.has(v.id));
+          return [...prev, ...newUnique];
+        });
       }
     } catch (err) {
       console.error('Error picking videos:', err);

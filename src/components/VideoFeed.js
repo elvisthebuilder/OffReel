@@ -48,10 +48,10 @@ export default function VideoFeed({ videos }) {
         decelerationRate="fast"
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
-        initialNumToRender={3}
-        maxToRenderPerBatch={3}
-        windowSize={5}
-        removeClippedSubviews={false}
+        initialNumToRender={1}
+        maxToRenderPerBatch={1}
+        windowSize={3}
+        removeClippedSubviews={true}
       />
       
       {videos.length > 0 && <FloatingPill activeAsset={videos[activeVideoIndex]} />}

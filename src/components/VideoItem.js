@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, View, Dimensions, Pressable, Text } from 'react-native';
+import { StyleSheet, View, Dimensions, Pressable, Text, TouchableOpacity } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import { Ionicons } from '@expo/vector-icons';
 
 const { height, width } = Dimensions.get('window');
 
 function ActiveVideoItem({ asset, isActive }) {
   const [isPausedByUser, setIsPausedByUser] = useState(false);
+  const [contentFit, setContentFit] = useState("cover");
 
   const player = useVideoPlayer(asset.uri, player => {
     player.loop = true;
@@ -34,6 +36,12 @@ function ActiveVideoItem({ asset, isActive }) {
     }
   };
 
+  const toggleFit = (e) => {
+    // Prevent the press from bubbling up to the Pressable and unpausing the video
+    e.stopPropagation();
+    setContentFit(prev => prev === "cover" ? "contain" : "cover");
+  };
+
   return (
     <View style={styles.videoContainer}>
       <VideoView
@@ -41,7 +49,7 @@ function ActiveVideoItem({ asset, isActive }) {
         player={player}
         showsControls={false}
         nativeControls={false}
-        contentFit="cover"
+        contentFit={contentFit}
       />
       
       {/* Massive invisible button overlaying the entire screen perfectly */}
@@ -49,6 +57,18 @@ function ActiveVideoItem({ asset, isActive }) {
         {isPausedByUser && isActive && (
           <View style={styles.pauseOverlay}>
             <Text style={styles.playIcon}>▶</Text>
+            
+            <TouchableOpacity 
+              style={styles.fitToggle} 
+              onPress={toggleFit} 
+              activeOpacity={0.7}
+            >
+              <Ionicons 
+                name={contentFit === "cover" ? "scan-outline" : "expand-outline"} 
+                size={18} 
+                color="#fff" 
+              />
+            </TouchableOpacity>
           </View>
         )}
       </Pressable>
@@ -102,5 +122,19 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.5)',
     textShadowOffset: {width: 0, height: 2},
     textShadowRadius: 10
+  },
+  fitToggle: {
+    position: 'absolute',
+    bottom: 120,
+    right: 20,
+    backgroundColor: 'rgba(30, 30, 30, 0.7)',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    zIndex: 100,
   }
 });
