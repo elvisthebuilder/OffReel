@@ -5,7 +5,7 @@ import VideoFeed from '../components/VideoFeed';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function HomeScreen() {
-  const { videos, loading, error, pickVideos } = useVideos();
+  const { videos, loading, error, pickVideos, autoScanGallery } = useVideos();
 
   if (loading) {
     return (
@@ -19,9 +19,10 @@ export default function HomeScreen() {
   if (error) {
     return (
       <View style={styles.centered}>
-        <Text style={styles.text}>Error: {error}</Text>
-        <TouchableOpacity style={[styles.button, {marginTop: 20}]} onPress={pickVideos}>
-          <Text style={styles.buttonText}>Try Again</Text>
+        <Text style={styles.text}>System Notice</Text>
+        <Text style={styles.subtext}>{error}</Text>
+        <TouchableOpacity style={[styles.buttonMain, {marginTop: 10}]} onPress={pickVideos}>
+          <Text style={styles.buttonMainText}>Select Manually</Text>
         </TouchableOpacity>
       </View>
     );
@@ -31,9 +32,14 @@ export default function HomeScreen() {
     return (
       <View style={styles.centered}>
         <Text style={styles.text}>Your Vault is Empty</Text>
-        <Text style={styles.subtext}>Select videos from your device to populate your temporary feed and test the UI.</Text>
-        <TouchableOpacity style={styles.button} onPress={pickVideos}>
-          <Text style={styles.buttonText}>Select Videos</Text>
+        <Text style={styles.subtext}>Choose how you want to populate your temporary testing feed.</Text>
+        
+        <TouchableOpacity style={styles.buttonMain} onPress={autoScanGallery}>
+          <Text style={styles.buttonMainText}>Auto-Scan Library</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity style={styles.buttonOutline} onPress={pickVideos}>
+          <Text style={styles.buttonOutlineText}>Select Manually</Text>
         </TouchableOpacity>
       </View>
     );
@@ -123,15 +129,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     lineHeight: 22,
   },
-  button: {
+  buttonMain: {
     backgroundColor: '#fff',
     paddingVertical: 14,
     paddingHorizontal: 30,
     borderRadius: 30,
+    marginBottom: 15,
+    width: '80%',
+    alignItems: 'center',
   },
-  buttonText: {
+  buttonMainText: {
     color: '#000',
     fontWeight: '700',
+    fontSize: 16,
+  },
+  buttonOutline: {
+    backgroundColor: '#000',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+    paddingVertical: 14,
+    paddingHorizontal: 30,
+    borderRadius: 30,
+    width: '80%',
+    alignItems: 'center',
+  },
+  buttonOutlineText: {
+    color: '#fff',
+    fontWeight: '600',
     fontSize: 16,
   }
 });
