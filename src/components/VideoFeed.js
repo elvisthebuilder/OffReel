@@ -1,13 +1,49 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { FlatList, StyleSheet, Dimensions, View } from 'react-native';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { FlatList, StyleSheet, Dimensions, View, ActivityIndicator } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import VideoItem from './VideoItem';
 import FloatingPill from './FloatingPill';
 
 const { height } = Dimensions.get('window');
+const LAST_VIDEO_ID_KEY = '@offreel_last_video_id';
 
 export default function VideoFeed({ videos }) {
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
-  const [feedHeight, setFeedHeight] = useState(height); // Fallback until measured
+  const [feedHeight, setFeedHeight] = useState(height);
+  const [isReady, setIsReady] = useState(false);
+
+  // Load physical ID dynamically against shifting indexes natively
+  useEffect(() => {
+    const loadSavedVideo = async () => {
+      try {
+        const savedVideoId = await AsyncStorage.getItem(LAST_VIDEO_ID_KEY);
+        if (savedVideoId !== null) {
+          // Mathematically derive exact array index placement if array sequence changed natively
+          const calculatedIndex = videos.findIndex(v => v.id === savedVideoId);
+          if (calculatedIndex > -1) {
+            setActiveVideoIndex(calculatedIndex);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to load last ID securely", e);
+      } finally {
+        setIsReady(true);
+      }
+    };
+    
+    if (videos.length > 0) {
+      loadSavedVideo();
+    } else {
+      setIsReady(true);
+    }
+  }, [videos]); // Bind firmly to physical array structural shifts
+
+  // Safely index currently viewing Video ID
+  useEffect(() => {
+    if (isReady && videos.length > 0 && videos[activeVideoIndex]) {
+      AsyncStorage.setItem(LAST_VIDEO_ID_KEY, videos[activeVideoIndex].id).catch(console.error);
+    }
+  }, [activeVideoIndex, isReady, videos]);
 
   const onViewableItemsChanged = useCallback(({ viewableItems }) => {
     if (viewableItems.length > 0) {
@@ -18,6 +54,12 @@ export default function VideoFeed({ videos }) {
   const viewabilityConfig = useRef({
     itemVisiblePercentThreshold: 50,
   }).current;
+
+  const getItemLayout = (data, index) => ({
+    length: feedHeight,
+    offset: feedHeight * index,
+    index,
+  });
 
   const renderItem = ({ item, index }) => {
     const isVisible = Math.abs(index - activeVideoIndex) <= 1;
@@ -31,6 +73,14 @@ export default function VideoFeed({ videos }) {
       />
     );
   };
+
+  if (!isReady) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#ffffff" />
+      </View>
+    );
+  }
 
   return (
     <View 
@@ -52,6 +102,8 @@ export default function VideoFeed({ videos }) {
         maxToRenderPerBatch={1}
         windowSize={3}
         removeClippedSubviews={true}
+        getItemLayout={getItemLayout}
+        initialScrollIndex={activeVideoIndex} // Dynamically scales to mathematically perfect matching state automatically
       />
       
       {videos.length > 0 && <FloatingPill activeAsset={videos[activeVideoIndex]} />}

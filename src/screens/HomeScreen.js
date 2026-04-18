@@ -3,15 +3,16 @@ import { StyleSheet, View, Text, ActivityIndicator, TouchableOpacity } from 'rea
 import { useVideos } from '../hooks/useVideos';
 import VideoFeed from '../components/VideoFeed';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function HomeScreen() {
-  const { videos, loading, error, pickVideos, autoScanGallery } = useVideos();
+  const { videos, loading, error, appMode, pickVideos, autoScanGallery, resetVault } = useVideos();
 
   if (loading) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#fff" />
-        <Text style={[styles.text, {marginTop: 15, fontSize: 16}]}>Opening Vault...</Text>
+        <Text style={[styles.text, {marginTop: 15, fontSize: 16}]}>Synchronizing Vault...</Text>
       </View>
     );
   }
@@ -24,40 +25,53 @@ export default function HomeScreen() {
         <TouchableOpacity style={[styles.buttonMain, {marginTop: 10}]} onPress={pickVideos}>
           <Text style={styles.buttonMainText}>Select Manually</Text>
         </TouchableOpacity>
+        
+        {/* Failsafe to break out of error loops into raw mode securely */}
+        <TouchableOpacity style={[styles.buttonOutline, {marginTop: 10, borderWidth: 0}]} onPress={resetVault}>
+          <Text style={[styles.buttonOutlineText, {color: 'rgba(255,255,255,0.4)', fontSize: 14}]}>Reset Mode</Text>
+        </TouchableOpacity>
       </View>
     );
   }
 
-  if (videos.length === 0) {
+  // Raw routing page safely awaiting routing protocol instructions natively
+  if (appMode === null || (appMode === 'manual' && videos.length === 0)) {
     return (
       <View style={styles.centered}>
         <Text style={styles.text}>Your Vault is Empty</Text>
-        <Text style={styles.subtext}>Choose how you want to populate your temporary testing feed.</Text>
+        <Text style={styles.subtext}>Choose how you want to natively sync your local gallery to OffReel.</Text>
         
         <TouchableOpacity style={styles.buttonMain} onPress={autoScanGallery}>
-          <Text style={styles.buttonMainText}>Auto-Scan Library</Text>
+          <Text style={styles.buttonMainText}>Live Auto-Sync OS Gallery</Text>
         </TouchableOpacity>
         
         <TouchableOpacity style={styles.buttonOutline} onPress={pickVideos}>
-          <Text style={styles.buttonOutlineText}>Select Manually</Text>
+          <Text style={styles.buttonOutlineText}>Custom Select Manually</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
+  // Active Feed Layering
   return (
     <View style={styles.container}>
       <VideoFeed videos={videos} />
       
-      {/* Title */}
       <SafeAreaView style={styles.header} edges={['top']} pointerEvents="none">
         <Text style={styles.headerText}>OffReel</Text>
       </SafeAreaView>
       
-      {/* Add More Button Overlay */}
       <SafeAreaView style={styles.addMoreContainer} edges={['top']}>
-        <TouchableOpacity style={styles.addMoreButton} onPress={pickVideos}>
-          <Text style={styles.addMoreText}>+</Text>
+        {/* Only enable + appending organically firmly within Custom Manual Modes */}
+        {appMode === 'manual' && (
+          <TouchableOpacity style={styles.addMoreButton} onPress={pickVideos}>
+            <Ionicons name="add" size={24} color="#fff" />
+          </TouchableOpacity>
+        )}
+        
+        {/* Master System Reset Toggle rendering safely top right to clear out explicit database pointers */}
+        <TouchableOpacity style={[styles.addMoreButton, { marginTop: appMode === 'manual' ? 15 : 0 }]} onPress={resetVault}>
+          <Ionicons name="settings-outline" size={20} color="rgba(255,255,255,0.7)" />
         </TouchableOpacity>
       </SafeAreaView>
     </View>
@@ -100,6 +114,7 @@ const styles = StyleSheet.create({
     right: 20,
     paddingTop: 5,
     zIndex: 11,
+    alignItems: 'center'
   },
   addMoreButton: {
     backgroundColor: 'rgba(255,255,255,0.15)',
@@ -108,12 +123,6 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  addMoreText: {
-    color: '#fff',
-    fontSize: 26,
-    fontWeight: '300',
-    marginTop: -3,
   },
   text: {
     color: '#fff',
