@@ -20,7 +20,15 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -33,6 +41,12 @@
           "photosPermission": "Allow OffReel to securely access your local videos to populate your feed."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "fd496ddf-bb33-440f-8db0-dda66444b665"
+      }
+    },
+    "owner": "elvisthebuilder"
   }
 }
