@@ -7,7 +7,7 @@ import FloatingPill from './FloatingPill';
 const { height } = Dimensions.get('window');
 const LAST_VIDEO_ID_KEY = '@offreel_last_video_id';
 
-export default function VideoFeed({ videos }) {
+export default function VideoFeed({ videos, defaultFit }) {
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
   const [feedHeight, setFeedHeight] = useState(height);
   const [isReady, setIsReady] = useState(false);
@@ -70,6 +70,7 @@ export default function VideoFeed({ videos }) {
         isActive={index === activeVideoIndex} 
         isVisible={isVisible}
         feedHeight={feedHeight}
+        defaultFit={defaultFit}
       />
     );
   };

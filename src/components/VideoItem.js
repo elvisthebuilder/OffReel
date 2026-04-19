@@ -5,9 +5,13 @@ import { Ionicons } from '@expo/vector-icons';
 
 const { height, width } = Dimensions.get('window');
 
-function ActiveVideoItem({ asset, isActive }) {
+function ActiveVideoItem({ asset, isActive, defaultFit }) {
   const [isPausedByUser, setIsPausedByUser] = useState(false);
-  const [contentFit, setContentFit] = useState("cover");
+  const [contentFit, setContentFit] = useState(defaultFit);
+
+  useEffect(() => {
+    setContentFit(defaultFit);
+  }, [defaultFit]);
 
   const player = useVideoPlayer(asset.uri, player => {
     player.loop = true;
@@ -76,11 +80,11 @@ function ActiveVideoItem({ asset, isActive }) {
   );
 }
 
-export default function VideoItem({ asset, isActive, isVisible, feedHeight }) {
+export default function VideoItem({ asset, isActive, isVisible, feedHeight, defaultFit }) {
   return (
     <View style={[styles.container, { height: feedHeight }]}>
       {isVisible ? (
-        <ActiveVideoItem asset={asset} isActive={isActive} />
+        <ActiveVideoItem asset={asset} isActive={isActive} defaultFit={defaultFit} />
       ) : (
         <View style={styles.placeholder} />
       )}

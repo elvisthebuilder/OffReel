@@ -5,12 +5,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const VAULT_STORAGE_KEY = '@offreel_vault_videos';
 const APP_MODE_KEY = '@offreel_app_mode';
+const DEFAULT_FIT_KEY = '@offreel_default_fit';
 
 export const useVideos = () => {
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [appMode, setAppMode] = useState(null);
+  const [defaultFit, setDefaultFit] = useState("cover");
 
   useEffect(() => {
     const bootApp = async () => {
@@ -18,14 +20,16 @@ export const useVideos = () => {
         const savedMode = await AsyncStorage.getItem(APP_MODE_KEY);
         setAppMode(savedMode);
         
+        const savedFit = await AsyncStorage.getItem(DEFAULT_FIT_KEY);
+        if (savedFit) {
+          setDefaultFit(savedFit);
+        }
+        
         if (savedMode === 'auto') {
-          // Live syncing directly from the Native OS
           await silentAutoScanGallery();
         } else if (savedMode === 'manual') {
-          // Read the persistent explicit user custom string list
           await loadManualVault();
         } else {
-          // First time boot - Vault natively empty awaiting input parameter choices
           setLoading(false);
         }
       } catch (err) {
@@ -160,5 +164,10 @@ export const useVideos = () => {
     }
   };
 
-  return { videos, loading, error, appMode, pickVideos, autoScanGallery, resetVault };
+  const changeDefaultFit = async (fitString) => {
+    await AsyncStorage.setItem(DEFAULT_FIT_KEY, fitString);
+    setDefaultFit(fitString);
+  };
+
+  return { videos, loading, error, appMode, defaultFit, changeDefaultFit, pickVideos, autoScanGallery, resetVault };
 };
