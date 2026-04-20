@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 
 export default function HomeScreen() {
-  const { videos, loading, error, appMode, defaultFit, changeDefaultFit, pickVideos, autoScanGallery } = useVideos();
+  const { videos, loading, error, appMode, defaultFit, changeDefaultFit, pickVideos, autoScanGallery, resetVault } = useVideos();
   const [isSettingsVisible, setIsSettingsVisible] = useState(false);
 
   // Wrapped sync actions that seamlessly drop the Modal overlay prior to executing
@@ -19,6 +19,11 @@ export default function HomeScreen() {
   const handleManualPath = async () => {
     setIsSettingsVisible(false);
     await pickVideos();
+  };
+
+  const handleReset = async () => {
+    setIsSettingsVisible(false);
+    await resetVault();
   };
 
   if (loading) {
@@ -145,6 +150,14 @@ export default function HomeScreen() {
                   </View>
                 </View>
                 {appMode === 'manual' && <Ionicons name="checkmark-circle" size={24} color="#000" />}
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalSection}>
+              <Text style={styles.sectionLabel}>DANGER ZONE</Text>
+              <TouchableOpacity style={styles.resetButton} onPress={handleReset}>
+                <Ionicons name="trash-outline" size={16} color="#ff3b30" />
+                <Text style={styles.resetButtonText}>Reset & Wipe Global Vault</Text>
               </TouchableOpacity>
             </View>
             
@@ -361,5 +374,21 @@ const styles = StyleSheet.create({
     color: '#777',
     fontSize: 12,
     fontWeight: '500',
+  },
+  resetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 59, 48, 0.1)',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 59, 48, 0.2)',
+  },
+  resetButtonText: {
+    color: '#ff3b30',
+    fontWeight: '700',
+    fontSize: 14,
   }
 });

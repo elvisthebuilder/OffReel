@@ -6,9 +6,30 @@ import * as Haptics from 'expo-haptics';
 
 const { height, width } = Dimensions.get('window');
 
-function ActiveVideoItem({ asset, isActive, defaultFit, isLiked, onDoubleTapLike }) {
-  const [isPausedByUser, setIsPausedByUser] = useState(false);
+function ActiveVideoItem({ asset, isActive, defaultFit, isLiked, onDoubleTapLike, onReady }) {
   const [contentFit, setContentFit] = useState(defaultFit);
+  const [isPausedByUser, setIsPausedByUser] = useState(false);
+  
+  const player = useVideoPlayer(asset.uri, (p) => {
+    p.loop = true;
+    p.play();
+    
+    // Turbo Buffer: Minimize start-up latency for raw files
+    p.bufferOptions = {
+        preferredForwardBufferDuration: 1, // Look ahead only 1s
+        minBufferForPlayback: 0.5,        // Start after only 0.5s of data
+        prioritizeTimeOverSizeThreshold: true // Prioritize start speed
+    };
+    
+    // Add listener to detect when hardware decoder is 100% ready to render
+    const subscription = p.addListener('statusChange', (payload) => {
+      if (payload.status === 'readyToPlay') {
+        onReady?.();
+      }
+    });
+    
+    return () => subscription.remove();
+  });
   const [heartPos, setHeartPos] = useState({ x: 0, y: 0 });
 
   // Animated values for the double-tap heart burst
@@ -20,11 +41,6 @@ function ActiveVideoItem({ asset, isActive, defaultFit, isLiked, onDoubleTapLike
   useEffect(() => {
     setContentFit(defaultFit);
   }, [defaultFit]);
-
-  const player = useVideoPlayer(asset.uri, player => {
-    player.loop = true;
-    player.muted = false;
-  });
 
   useEffect(() => {
     if (isActive) {
@@ -142,19 +158,74 @@ function ActiveVideoItem({ asset, isActive, defaultFit, isLiked, onDoubleTapLike
   );
 }
 
+function VideoThumbnail({ asset, contentFit, opacity = 1, pointerEvents = 'auto' }) {
+  return (
+    <Animated.View 
+      pointerEvents={pointerEvents}
+      style={[styles.thumbnailContainer, { opacity, position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10 }]}
+    >
+      {/* 
+          Using the video URI as an Image source is a high-performance 
+          way to show the first frame/poster without starting the decoder.
+      */}
+      <Animated.Image
+        source={{ uri: asset.uri }}
+        style={[styles.video]}
+        resizeMode={contentFit === 'cover' ? 'cover' : 'contain'}
+      />
+      <View style={styles.thumbnailOverlay} />
+    </Animated.View>
+  );
+}
+
 export default function VideoItem({ asset, isActive, isVisible, feedHeight, defaultFit, isLiked, onDoubleTapLike }) {
+  const [isPlayerReady, setIsPlayerReady] = useState(false);
+  const posterOpacity = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (isPlayerReady) {
+      // Hardware is ready — melt the thumbnail into the player
+      Animated.timing(posterOpacity, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      posterOpacity.setValue(1);
+    }
+  }, [isPlayerReady]);
+
   return (
     <View style={[styles.container, { height: feedHeight }]}>
-      {isVisible ? (
-        <ActiveVideoItem
-          asset={asset}
-          isActive={isActive}
-          defaultFit={defaultFit}
-          isLiked={isLiked}
-          onDoubleTapLike={onDoubleTapLike}
-        />
+      {/* 
+          STRICT STABILITY FIX:
+          We ONLY mount ActiveVideoItem (and its player) if 'isActive' is true.
+          This guarantees exactly ONE hardware decoder is active at any time.
+      */}
+      {isActive ? (
+        <View style={styles.videoContainer}>
+          <ActiveVideoItem
+            asset={asset}
+            isActive={isActive}
+            defaultFit={defaultFit}
+            isLiked={isLiked}
+            onDoubleTapLike={onDoubleTapLike}
+            onReady={() => setIsPlayerReady(true)}
+          />
+          {/* Layered Reveal Poster */}
+          <VideoThumbnail 
+            asset={asset} 
+            contentFit={defaultFit} 
+            opacity={posterOpacity} 
+            pointerEvents={isPlayerReady ? 'none' : 'auto'}
+          />
+        </View>
+      ) : isVisible ? (
+        <VideoThumbnail asset={asset} contentFit={defaultFit} />
       ) : (
-        <View style={styles.placeholder} />
+        <View style={styles.placeholder}>
+             <Ionicons name="videocam-outline" size={40} color="rgba(255,255,255,0.05)" />
+        </View>
       )}
     </View>
   );
@@ -170,6 +241,16 @@ const styles = StyleSheet.create({
   videoContainer: {
     width: '100%',
     height: '100%',
+  },
+  thumbnailContainer: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#000',
+  },
+  thumbnailOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   video: {
     width: '100%',

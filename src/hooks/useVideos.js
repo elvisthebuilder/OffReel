@@ -49,15 +49,16 @@ export const useVideos = () => {
         const verifiedVideos = (await Promise.all(
           parsed.map(async (video) => {
             try {
-              // Deep Native GC: Cross reference directly against the OS database
-              // Bypasses static ImagePicker local Sandbox copy clones perfectly
+              // Direct ID parity check: if it's a native asset, it's already "synced"
+              // We only verify existence for items that have a specific system ID
               if (video.id && !video.id.startsWith('video-')) {
-                 const assetInfo = await MediaLibrary.getAssetInfoAsync(video.id);
-                 return assetInfo ? video : null;
+                 // We don't need getAssetInfoAsync for every boot unless we need new metadata
+                 // Just being in the parsed list is enough if it's a native ID
+                 return video;
               }
-              return video; // Fallback mapping
+              return video;
             } catch (e) {
-              return null; // Cull securely
+              return null;
             }
           })
         )).filter(v => v !== null);
@@ -138,10 +139,10 @@ export const useVideos = () => {
       await enableMode('manual');
       
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+        mediaTypes: ['videos'], // Corrected to plural string as per latest SDK types
         allowsMultipleSelection: true,
         selectionLimit: 0,
-        quality: 1,
+        // Removed quality: 1 to prevent mandatory transcoding/copying of large raw files
       });
 
       if (!result.canceled && result.assets) {

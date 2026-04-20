@@ -65,7 +65,7 @@ export default function VideoFeed({ videos, defaultFit }) {
   }, []);
 
   const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 50,
+    itemVisiblePercentThreshold: 80, // Tighten threshold to ensure strictly focused player triggering
   }).current;
 
   const getItemLayout = (data, index) => ({
@@ -116,7 +116,7 @@ export default function VideoFeed({ videos, defaultFit }) {
         viewabilityConfig={viewabilityConfig}
         initialNumToRender={1}
         maxToRenderPerBatch={1}
-        windowSize={3}
+        windowSize={2} // Reduced to current + 1 neighbor to minimize memory pressure
         removeClippedSubviews={true}
         getItemLayout={getItemLayout}
         initialScrollIndex={activeVideoIndex} // Dynamically scales to mathematically perfect matching state automatically
