@@ -11,6 +11,19 @@ export default function VideoFeed({ videos, defaultFit }) {
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
   const [feedHeight, setFeedHeight] = useState(height);
   const [isReady, setIsReady] = useState(false);
+  const [favorites, setFavorites] = useState(new Set());
+
+  const toggleFavorite = useCallback((assetId) => {
+    setFavorites(prev => {
+      const next = new Set(prev);
+      if (next.has(assetId)) {
+        next.delete(assetId);
+      } else {
+        next.add(assetId);
+      }
+      return next;
+    });
+  }, []);
 
   // Load physical ID dynamically against shifting indexes natively
   useEffect(() => {
@@ -65,12 +78,14 @@ export default function VideoFeed({ videos, defaultFit }) {
     const isVisible = Math.abs(index - activeVideoIndex) <= 1;
 
     return (
-      <VideoItem 
-        asset={item} 
-        isActive={index === activeVideoIndex} 
+      <VideoItem
+        asset={item}
+        isActive={index === activeVideoIndex}
         isVisible={isVisible}
         feedHeight={feedHeight}
         defaultFit={defaultFit}
+        isLiked={favorites.has(item.id)}
+        onDoubleTapLike={() => toggleFavorite(item.id)}
       />
     );
   };
@@ -107,7 +122,13 @@ export default function VideoFeed({ videos, defaultFit }) {
         initialScrollIndex={activeVideoIndex} // Dynamically scales to mathematically perfect matching state automatically
       />
       
-      {videos.length > 0 && <FloatingPill activeAsset={videos[activeVideoIndex]} />}
+      {videos.length > 0 && (
+        <FloatingPill
+          activeAsset={videos[activeVideoIndex]}
+          favorites={favorites}
+          onToggleFavorite={toggleFavorite}
+        />
+      )}
     </View>
   );
 }

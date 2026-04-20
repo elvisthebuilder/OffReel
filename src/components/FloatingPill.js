@@ -4,8 +4,7 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import * as Sharing from 'expo-sharing';
 
-export default function FloatingPill({ activeAsset }) {
-  const [favorites, setFavorites] = useState(new Set());
+export default function FloatingPill({ activeAsset, favorites, onToggleFavorite }) {
   const [modalVisible, setModalVisible] = useState(false);
 
   const isFavorited = activeAsset ? favorites.has(activeAsset.id) : false;
@@ -13,16 +12,7 @@ export default function FloatingPill({ activeAsset }) {
   const handleFavorite = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (!activeAsset) return;
-
-    setFavorites(prev => {
-      const next = new Set(prev);
-      if (next.has(activeAsset.id)) {
-        next.delete(activeAsset.id);
-      } else {
-        next.add(activeAsset.id);
-      }
-      return next;
-    });
+    onToggleFavorite(activeAsset.id);
   };
 
   const handleShare = async () => {
