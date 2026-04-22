@@ -9,6 +9,7 @@ const { height, width } = Dimensions.get('window');
 function ActiveVideoItem({ asset, isActive, defaultFit, isLiked, onDoubleTapLike, onReady }) {
   const [contentFit, setContentFit] = useState(defaultFit);
   const [isPausedByUser, setIsPausedByUser] = useState(false);
+  const videoOpacity = useRef(new Animated.Value(0)).current;
   
   const player = useVideoPlayer(asset.uri, (p) => {
     p.loop = true;
@@ -24,6 +25,12 @@ function ActiveVideoItem({ asset, isActive, defaultFit, isLiked, onDoubleTapLike
     // Add listener to detect when hardware decoder is 100% ready to render
     const subscription = p.addListener('statusChange', (payload) => {
       if (payload.status === 'readyToPlay') {
+        // DISSOLVE IN: Fade the video layer in over the thumbnail for instant feel
+        Animated.timing(videoOpacity, {
+          toValue: 1,
+          duration: 150, // Ultra-fast snap
+          useNativeDriver: true,
+        }).start();
         onReady?.();
       }
     });
@@ -51,6 +58,7 @@ function ActiveVideoItem({ asset, isActive, defaultFit, isLiked, onDoubleTapLike
       player.pause();
       player.currentTime = 0;
       setIsPausedByUser(false);
+      videoOpacity.setValue(0); // Reset for next mount
     }
   }, [isActive, isPausedByUser, player]);
 
@@ -111,13 +119,15 @@ function ActiveVideoItem({ asset, isActive, defaultFit, isLiked, onDoubleTapLike
 
   return (
     <View style={styles.videoContainer}>
-      <VideoView
-        style={styles.video}
-        player={player}
-        showsControls={false}
-        nativeControls={false}
-        contentFit={contentFit}
-      />
+      <Animated.View style={[styles.video, { opacity: videoOpacity }]}>
+        <VideoView
+          style={styles.video}
+          player={player}
+          showsControls={false}
+          nativeControls={false}
+          contentFit={contentFit}
+        />
+      </Animated.View>
 
       {/* Full-screen tap handler — single = pause, double = like */}
       <Pressable style={StyleSheet.absoluteFill} onPress={handleTap}>
@@ -162,7 +172,7 @@ function VideoThumbnail({ asset, contentFit, opacity = 1, pointerEvents = 'auto'
   return (
     <Animated.View 
       pointerEvents={pointerEvents}
-      style={[styles.thumbnailContainer, { opacity, position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10 }]}
+      style={[styles.thumbnailContainer, { opacity, position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1 }]}
     >
       {/* 
           Using the video URI as an Image source is a high-performance 
@@ -180,20 +190,6 @@ function VideoThumbnail({ asset, contentFit, opacity = 1, pointerEvents = 'auto'
 
 export default function VideoItem({ asset, isActive, isVisible, feedHeight, defaultFit, isLiked, onDoubleTapLike }) {
   const [isPlayerReady, setIsPlayerReady] = useState(false);
-  const posterOpacity = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    if (isPlayerReady) {
-      // Hardware is ready — melt the thumbnail into the player
-      Animated.timing(posterOpacity, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      posterOpacity.setValue(1);
-    }
-  }, [isPlayerReady]);
 
   return (
     <View style={[styles.container, { height: feedHeight }]}>
@@ -204,21 +200,21 @@ export default function VideoItem({ asset, isActive, isVisible, feedHeight, defa
       */}
       {isActive ? (
         <View style={styles.videoContainer}>
-          <ActiveVideoItem
-            asset={asset}
-            isActive={isActive}
-            defaultFit={defaultFit}
-            isLiked={isLiked}
-            onDoubleTapLike={onDoubleTapLike}
-            onReady={() => setIsPlayerReady(true)}
-          />
-          {/* Layered Reveal Poster */}
-          <VideoThumbnail 
-            asset={asset} 
-            contentFit={defaultFit} 
-            opacity={posterOpacity} 
-            pointerEvents={isPlayerReady ? 'none' : 'auto'}
-          />
+            {/* The Thumbnail stays as a base layer */}
+            <VideoThumbnail 
+                asset={asset} 
+                contentFit={defaultFit} 
+                pointerEvents={'none'}
+            />
+            {/* The Player dissolves IN on top of it */}
+            <ActiveVideoItem
+                asset={asset}
+                isActive={isActive}
+                defaultFit={defaultFit}
+                isLiked={isLiked}
+                onDoubleTapLike={onDoubleTapLike}
+                onReady={() => setIsPlayerReady(true)}
+            />
         </View>
       ) : isVisible ? (
         <VideoThumbnail asset={asset} contentFit={defaultFit} />

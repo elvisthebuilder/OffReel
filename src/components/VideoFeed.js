@@ -8,6 +8,7 @@ const { height } = Dimensions.get('window');
 const LAST_VIDEO_ID_KEY = '@offreel_last_video_id';
 
 export default function VideoFeed({ videos, defaultFit }) {
+  const flatListRef = useRef(null);
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
   const [feedHeight, setFeedHeight] = useState(height);
   const [isReady, setIsReady] = useState(false);
@@ -35,6 +36,16 @@ export default function VideoFeed({ videos, defaultFit }) {
           const calculatedIndex = videos.findIndex(v => v.id === savedVideoId);
           if (calculatedIndex > -1) {
             setActiveVideoIndex(calculatedIndex);
+            
+            // PRECISE SCROLL: Wait for layout to be measured then snap to exact target
+            if (feedHeight > 0 && flatListRef.current) {
+              setTimeout(() => {
+                flatListRef.current?.scrollToIndex({
+                  index: calculatedIndex,
+                  animated: false
+                });
+              }, 100);
+            }
           }
         }
       } catch (e) {
@@ -49,13 +60,22 @@ export default function VideoFeed({ videos, defaultFit }) {
     } else {
       setIsReady(true);
     }
-  }, [videos]); // Bind firmly to physical array structural shifts
+  }, [videos, feedHeight]); // Re-run if layout changes to ensure math is perfect
 
-  // Safely index currently viewing Video ID
+  // Safely index currently viewing Video ID — STRICT REPLACEMENT ONLY
   useEffect(() => {
-    if (isReady && videos.length > 0 && videos[activeVideoIndex]) {
-      AsyncStorage.setItem(LAST_VIDEO_ID_KEY, videos[activeVideoIndex].id).catch(console.error);
-    }
+    const saveCurrentPos = async () => {
+        if (isReady && videos.length > 0 && videos[activeVideoIndex]) {
+            const currentId = videos[activeVideoIndex].id;
+            const savedId = await AsyncStorage.getItem(LAST_VIDEO_ID_KEY);
+            
+            // Only write to disk if the ID has actually changed (saves battery/wear)
+            if (currentId !== savedId) {
+                await AsyncStorage.setItem(LAST_VIDEO_ID_KEY, currentId);
+            }
+        }
+    };
+    saveCurrentPos().catch(console.error);
   }, [activeVideoIndex, isReady, videos]);
 
   const onViewableItemsChanged = useCallback(({ viewableItems }) => {
@@ -104,6 +124,7 @@ export default function VideoFeed({ videos, defaultFit }) {
       onLayout={(e) => setFeedHeight(e.nativeEvent.layout.height)}
     >
       <FlatList
+        ref={flatListRef}
         data={videos}
         renderItem={renderItem}
         keyExtractor={item => item.id}
@@ -118,8 +139,9 @@ export default function VideoFeed({ videos, defaultFit }) {
         maxToRenderPerBatch={1}
         windowSize={2} // Reduced to current + 1 neighbor to minimize memory pressure
         removeClippedSubviews={true}
+        updateCellsBatchingPeriod={50} // Hardened throttle to prevent decoder contention
         getItemLayout={getItemLayout}
-        initialScrollIndex={activeVideoIndex} // Dynamically scales to mathematically perfect matching state automatically
+        // Removing initialScrollIndex in favor of the more reliable Precise Scroll Engine
       />
       
       {videos.length > 0 && (

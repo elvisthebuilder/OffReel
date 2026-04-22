@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, ActivityIndicator, TouchableOpacity, Modal } from 'react-native';
+import { StyleSheet, View, Text, ActivityIndicator, TouchableOpacity, Modal, FlatList, Image, Linking } from 'react-native';
 import { useVideos } from '../hooks/useVideos';
 import VideoFeed from '../components/VideoFeed';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,8 +7,23 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 
 export default function HomeScreen() {
-  const { videos, loading, error, appMode, defaultFit, changeDefaultFit, pickVideos, autoScanGallery, resetVault } = useVideos();
+  const { 
+    videos, 
+    loading, 
+    error, 
+    appMode, 
+    defaultFit, 
+    changeDefaultFit, 
+    getManualSelectionPool, 
+    addManualVideos, 
+    autoScanGallery, 
+    resetVault 
+  } = useVideos();
+
   const [isSettingsVisible, setIsSettingsVisible] = useState(false);
+  const [isPickerVisible, setIsPickerVisible] = useState(false);
+  const [galleryPool, setGalleryPool] = useState([]);
+  const [selectedVideos, setSelectedVideos] = useState(new Set());
 
   // Wrapped sync actions that seamlessly drop the Modal overlay prior to executing
   const handleAutoScan = async () => {
@@ -18,7 +33,10 @@ export default function HomeScreen() {
 
   const handleManualPath = async () => {
     setIsSettingsVisible(false);
-    await pickVideos();
+    const pool = await getManualSelectionPool();
+    setGalleryPool(pool);
+    setSelectedVideos(new Set());
+    setIsPickerVisible(true);
   };
 
   const handleReset = async () => {
@@ -26,7 +44,24 @@ export default function HomeScreen() {
     await resetVault();
   };
 
-  if (loading) {
+  const toggleVideoSelection = (id) => {
+    setSelectedVideos(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const finalizeManualSelection = async () => {
+    const chosen = galleryPool.filter(v => selectedVideos.has(v.id));
+    if (chosen.length > 0) {
+      await addManualVideos(chosen);
+    }
+    setIsPickerVisible(false);
+  };
+
+  if (loading && !isPickerVisible) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#fff" />
@@ -40,7 +75,7 @@ export default function HomeScreen() {
       <View style={styles.centered}>
         <Text style={styles.text}>System Notice</Text>
         <Text style={styles.subtext}>{error}</Text>
-        <TouchableOpacity style={[styles.buttonMain, {marginTop: 10}]} onPress={pickVideos}>
+        <TouchableOpacity style={[styles.buttonMain, {marginTop: 10}]} onPress={handleManualPath}>
           <Text style={styles.buttonMainText}>Select Manually</Text>
         </TouchableOpacity>
       </View>
@@ -58,10 +93,53 @@ export default function HomeScreen() {
           <Text style={styles.buttonMainText}>Live Auto-Sync OS Gallery</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.buttonOutline} onPress={pickVideos}>
+        <TouchableOpacity style={styles.buttonOutline} onPress={handleManualPath}>
           <Text style={styles.buttonOutlineText}>Custom Select Manually</Text>
         </TouchableOpacity>
+
+        {/* Picker Modal positioned for early access */}
+        {renderPickerModal()}
       </View>
+    );
+  }
+
+  function renderPickerModal() {
+    return (
+      <Modal visible={isPickerVisible} animationType="slide">
+        <SafeAreaView style={styles.pickerContainer}>
+          <View style={styles.pickerHeader}>
+            <TouchableOpacity onPress={() => setIsPickerVisible(false)}>
+              <Text style={styles.pickerCancel}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.pickerTitle}>Select Videos</Text>
+            <TouchableOpacity onPress={finalizeManualSelection}>
+              <Text style={styles.pickerDone}>Add ({selectedVideos.size})</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <FlatList
+            data={galleryPool}
+            keyExtractor={item => item.id}
+            numColumns={3}
+            renderItem={({ item }) => {
+              const isSelected = selectedVideos.has(item.id);
+              return (
+                <TouchableOpacity 
+                  style={styles.pickerItem} 
+                  onPress={() => toggleVideoSelection(item.id)}
+                >
+                  <Image source={{ uri: item.uri }} style={styles.pickerImage} />
+                  {isSelected && (
+                    <View style={styles.selectionOverlay}>
+                      <Ionicons name="checkmark-circle" size={24} color="#fff" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            }}
+          />
+        </SafeAreaView>
+      </Modal>
     );
   }
 
@@ -78,7 +156,7 @@ export default function HomeScreen() {
       <SafeAreaView style={styles.addMoreContainer} edges={['top']}>
         {/* Only enable + appending organically firmly within Custom Manual Modes */}
         {appMode === 'manual' && (
-          <TouchableOpacity style={styles.addMoreButton} onPress={pickVideos}>
+          <TouchableOpacity style={styles.addMoreButton} onPress={handleManualPath}>
             <Ionicons name="add" size={24} color="#fff" />
           </TouchableOpacity>
         )}
@@ -88,6 +166,9 @@ export default function HomeScreen() {
           <Ionicons name="settings-outline" size={20} color="rgba(255,255,255,0.7)" />
         </TouchableOpacity>
       </SafeAreaView>
+
+      {/* Picker Modal Integration */}
+      {renderPickerModal()}
 
       {/* Settings Modal Framework Overlaid securely on active Z-Axis exclusively */}
       <Modal visible={isSettingsVisible} transparent={true} animationType="slide">
@@ -150,6 +231,43 @@ export default function HomeScreen() {
                   </View>
                 </View>
                 {appMode === 'manual' && <Ionicons name="checkmark-circle" size={24} color="#000" />}
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.actionRow, {marginTop: 10, borderColor: 'rgba(255,255,255,0.05)', backgroundColor: 'rgba(255,255,255,0.02)'}]} 
+                onPress={() => {
+                  setIsSettingsVisible(false);
+                  autoScanGallery(); // Forces a re-bind of all native URIs
+                }}
+              >
+                <View style={styles.actionRowLeft}>
+                  <View style={[styles.iconCircle, {backgroundColor: '#333'}]}>
+                     <Ionicons name="refresh" size={16} color="#fff" />
+                  </View>
+                  <View>
+                    <Text style={styles.actionTitle}>Refresh Media Bridge</Text>
+                    <Text style={styles.actionSub}>Fixes "Blank Screen" if decoder hangs</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalSection}>
+              <Text style={styles.sectionLabel}>COMMUNITY</Text>
+              <TouchableOpacity 
+                style={[styles.actionRow, { borderStyle: 'dashed', borderColor: 'rgba(88, 101, 242, 0.5)' }]} 
+                onPress={() => Linking.openURL('https://discord.gg/5QYH4xaS')}
+              >
+                <View style={styles.actionRowLeft}>
+                  <View style={[styles.iconCircle, {backgroundColor: '#5865F2'}]}>
+                     <Ionicons name="logo-discord" size={16} color="#fff" />
+                  </View>
+                  <View>
+                    <Text style={styles.actionTitle}>Join The Vault</Text>
+                    <Text style={styles.actionSub}>Official Discord Community</Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#5865F2" />
               </TouchableOpacity>
             </View>
 
@@ -232,31 +350,39 @@ const styles = StyleSheet.create({
   },
   buttonMain: {
     backgroundColor: '#fff',
-    paddingVertical: 14,
+    paddingVertical: 16,
     paddingHorizontal: 30,
-    borderRadius: 30,
+    borderRadius: 16,
     width: '100%',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
   },
   buttonMainText: {
     color: '#000',
-    fontWeight: '700',
+    fontWeight: '800',
     fontSize: 16,
+    letterSpacing: -0.2,
   },
   buttonOutline: {
-    backgroundColor: '#000',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
-    paddingVertical: 14,
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.15)',
+    paddingVertical: 16,
     paddingHorizontal: 30,
-    borderRadius: 30,
+    borderRadius: 16,
     width: '100%',
     alignItems: 'center',
+    marginTop: 12, // Significant spacing for clarity
   },
   buttonOutlineText: {
-    color: '#fff',
-    fontWeight: '600',
+    color: 'rgba(255,255,255,0.8)',
+    fontWeight: '700',
     fontSize: 16,
+    letterSpacing: -0.2,
   },
   modalBackdrop: {
     flex: 1,
@@ -390,5 +516,47 @@ const styles = StyleSheet.create({
     color: '#ff3b30',
     fontWeight: '700',
     fontSize: 14,
+  },
+  pickerContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#222',
+  },
+  pickerTitle: {
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  pickerCancel: {
+    color: '#888',
+    fontSize: 16,
+  },
+  pickerDone: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  pickerItem: {
+    flex: 1/3,
+    aspectRatio: 1,
+    padding: 1,
+  },
+  pickerImage: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#111',
+  },
+  selectionOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
   }
 });

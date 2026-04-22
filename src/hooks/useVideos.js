@@ -95,24 +95,54 @@ export const useVideos = () => {
     setVideos([]);
   };
 
-  const silentAutoScanGallery = async () => {
-    try {
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== 'granted') throw new Error("Permission permanently denied.");
+  const fetchAllGalleryVideos = async () => {
+    // Stage 1: Get current permission state without triggering a prompt
+    let { status, canAskAgain } = await MediaLibrary.getPermissionsAsync();
+    
+    // Stage 2: Only prompt if we lack access but are permitted to ask
+    if (status !== 'granted' && canAskAgain) {
+      try {
+        const request = await MediaLibrary.requestPermissionsAsync();
+        status = request.status;
+      } catch (err) {
+        console.warn("Native permission request failed:", err);
+      }
+    }
+    
+    // Stage 3: Final validation before accessing the bridge
+    if (status !== 'granted') {
+      throw new Error("OffReel needs gallery access to populate your Vault.");
+    }
 
-      const media = await MediaLibrary.getAssetsAsync({
+    let allAssets = [];
+    let hasNextPage = true;
+    let endCursor = undefined;
+
+    while (hasNextPage) {
+      const result = await MediaLibrary.getAssetsAsync({
         mediaType: 'video',
-        first: 100, // Safe default payload batch
+        first: 50, // Small batches for bridge stability
+        after: endCursor,
         sortBy: ['creationTime'],
       });
+      
+      allAssets = [...allAssets, ...result.assets];
+      hasNextPage = result.hasNextPage;
+      endCursor = result.endCursor;
+    }
 
-      if (!media.assets || media.assets.length === 0) throw new Error("Vault is physically empty.");
+    return allAssets.map((asset, index) => ({
+      id: asset.id,
+      uri: asset.uri,
+      filename: asset.filename || `Scanned Video ${index + 1}`,
+    }));
+  };
 
-      setVideos(media.assets.map((asset, index) => ({
-        id: asset.id,
-        uri: asset.uri,
-        filename: asset.filename || `Scanned Video ${index + 1}`,
-      })));
+  const silentAutoScanGallery = async () => {
+    try {
+      const allVideos = await fetchAllGalleryVideos();
+      if (allVideos.length === 0) throw new Error("Vault is physically empty.");
+      setVideos(allVideos);
     } catch (err) {
       console.error('Background auto-scan silently failed:', err);
     } finally {
@@ -132,36 +162,27 @@ export const useVideos = () => {
     }
   };
 
-  const pickVideos = async () => {
+  const getManualSelectionPool = async () => {
     try {
       setLoading(true);
-      setError(null);
-      await enableMode('manual');
-      
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['videos'], // Corrected to plural string as per latest SDK types
-        allowsMultipleSelection: true,
-        selectionLimit: 0,
-        // Removed quality: 1 to prevent mandatory transcoding/copying of large raw files
-      });
-
-      if (!result.canceled && result.assets) {
-        const pickedAssets = result.assets.map((asset, index) => ({
-          id: asset.assetId || `video-${index}-${Date.now()}`,
-          uri: asset.uri,
-          filename: asset.fileName || `Selected Video ${index + 1}`,
-        }));
-        
-        setVideos(prev => {
-          const existingIds = new Set(prev.map(v => v.id));
-          const newUnique = pickedAssets.filter(v => !existingIds.has(v.id));
-          return [...prev, ...newUnique];
-        });
-      }
+      const pool = await fetchAllGalleryVideos();
+      setLoading(false);
+      return pool;
     } catch (err) {
       setError(err.message);
-    } finally {
       setLoading(false);
+      return [];
+    }
+  };
+
+  const addManualVideos = async (newAssets) => {
+    setVideos(prev => {
+      const existingIds = new Set(prev.map(v => v.id));
+      const newUnique = newAssets.filter(v => !existingIds.has(v.id));
+      return [...prev, ...newUnique];
+    });
+    if (appMode !== 'manual') {
+      await enableMode('manual');
     }
   };
 
@@ -170,5 +191,16 @@ export const useVideos = () => {
     setDefaultFit(fitString);
   };
 
-  return { videos, loading, error, appMode, defaultFit, changeDefaultFit, pickVideos, autoScanGallery, resetVault };
+  return { 
+    videos, 
+    loading, 
+    error, 
+    appMode, 
+    defaultFit, 
+    changeDefaultFit, 
+    getManualSelectionPool, 
+    addManualVideos, 
+    autoScanGallery, 
+    resetVault 
+  };
 };
