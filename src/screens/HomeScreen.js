@@ -88,8 +88,7 @@ export default function HomeScreen() {
       <View style={[styles.centered, { backgroundColor: '#000' }]}>
         <VaultSkeleton />
         <View style={styles.syncOverlay}>
-           <ActivityIndicator size="small" color="rgba(255,255,255,0.4)" />
-           <Text style={[styles.text, {marginTop: 15, fontSize: 13, letterSpacing: 1, opacity: 0.8}]}>
+           <Text style={[styles.text, { fontSize: 11, letterSpacing: 3, opacity: 0.5, fontWeight: '800' }]}>
              {syncStatus.toUpperCase()}
            </Text>
         </View>

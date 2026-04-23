@@ -190,6 +190,20 @@ function VideoThumbnail({ asset, contentFit, opacity = 1, pointerEvents = 'auto'
 
 export default function VideoItem({ asset, isActive, isVisible, feedHeight, defaultFit, isLiked, onDoubleTapLike }) {
   const [isPlayerReady, setIsPlayerReady] = useState(false);
+  const posterOpacity = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (isPlayerReady) {
+      // Hardware is ready — Melt the thumbnail away as the video emerges
+      Animated.timing(posterOpacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      posterOpacity.setValue(1);
+    }
+  }, [isPlayerReady]);
 
   return (
     <View style={[styles.container, { height: feedHeight }]}>
@@ -200,13 +214,14 @@ export default function VideoItem({ asset, isActive, isVisible, feedHeight, defa
       */}
       {isActive ? (
         <View style={styles.videoContainer}>
-            {/* The Thumbnail stays as a base layer */}
+            {/* The Thumbnail base layer */}
             <VideoThumbnail 
                 asset={asset} 
                 contentFit={defaultFit} 
+                opacity={posterOpacity}
                 pointerEvents={'none'}
             />
-            {/* The Player dissolves IN on top of it */}
+            {/* The Player layer */}
             <ActiveVideoItem
                 asset={asset}
                 isActive={isActive}
