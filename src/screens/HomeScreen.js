@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, ActivityIndicator, TouchableOpacity, Modal, FlatList, Image, Linking } from 'react-native';
+import { StyleSheet, View, Text, ActivityIndicator, TouchableOpacity, Modal, FlatList, Image, Linking, ToastAndroid } from 'react-native';
 import { useVideos } from '../hooks/useVideos';
 import VideoFeed from '../components/VideoFeed';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -163,8 +163,13 @@ export default function HomeScreen() {
                 return (
                   <TouchableOpacity 
                     style={[styles.pickerItem, isAlreadyInVault && { opacity: 0.3 }]}
-                    disabled={isAlreadyInVault}
-                    onPress={() => toggleVideoSelection(item.id)}
+                    onPress={() => {
+                      if (isAlreadyInVault) {
+                        ToastAndroid.show("This video is already in your Vault", ToastAndroid.SHORT);
+                      } else {
+                        toggleVideoSelection(item.id);
+                      }
+                    }}
                   >
                     <Image source={{ uri: item.uri }} style={styles.pickerImage} />
                     
