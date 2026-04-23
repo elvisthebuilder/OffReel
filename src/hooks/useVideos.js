@@ -26,7 +26,17 @@ export const useVideos = () => {
         }
         
         if (savedMode === 'auto') {
-          await silentAutoScanGallery();
+          // INSTANT RESUME: Load the cached gallery map first to get the UI ready immediately
+          const cachedVault = await AsyncStorage.getItem(VAULT_STORAGE_KEY);
+          if (cachedVault) {
+            setVideos(JSON.parse(cachedVault));
+            setLoading(false);
+            // Non-blocking background sync to catch new device videos
+            silentAutoScanGallery(false); 
+          } else {
+            // First time ever: full scan required
+            await silentAutoScanGallery(true);
+          }
         } else if (savedMode === 'manual') {
           await loadManualVault();
         } else {
@@ -138,11 +148,15 @@ export const useVideos = () => {
     }));
   };
 
-  const silentAutoScanGallery = async () => {
+  const silentAutoScanGallery = async (shouldSetLoading = false) => {
     try {
+      if (shouldSetLoading) setLoading(true);
       const allVideos = await fetchAllGalleryVideos();
       if (allVideos.length === 0) throw new Error("Vault is physically empty.");
+      
       setVideos(allVideos);
+      // Persist the map for instant resume on next launch
+      await AsyncStorage.setItem(VAULT_STORAGE_KEY, JSON.stringify(allVideos));
     } catch (err) {
       console.error('Background auto-scan silently failed:', err);
     } finally {
@@ -152,10 +166,9 @@ export const useVideos = () => {
 
   const autoScanGallery = async () => {
     try {
-      setLoading(true);
       setError(null);
       await enableMode('auto');
-      await silentAutoScanGallery();
+      await silentAutoScanGallery(true);
     } catch (err) {
       setError(err.message);
       setLoading(false);
