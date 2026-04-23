@@ -3,6 +3,7 @@ import { FlatList, StyleSheet, Dimensions, View, ActivityIndicator } from 'react
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import VideoItem from './VideoItem';
 import FloatingPill from './FloatingPill';
+import VaultSkeleton from './VaultSkeleton';
 
 const { height } = Dimensions.get('window');
 const LAST_VIDEO_ID_KEY = '@offreel_last_video_id';
@@ -112,8 +113,8 @@ export default function VideoFeed({ videos, defaultFit }) {
 
   if (!isReady) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color="#ffffff" />
+      <View style={styles.container}>
+        <VaultSkeleton />
       </View>
     );
   }

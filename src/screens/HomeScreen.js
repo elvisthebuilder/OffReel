@@ -5,6 +5,8 @@ import VideoFeed from '../components/VideoFeed';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
+import VaultSkeleton from '../components/VaultSkeleton';
+import { useEffect } from 'react';
 
 export default function HomeScreen() {
   const { 
@@ -24,6 +26,26 @@ export default function HomeScreen() {
   const [isPickerVisible, setIsPickerVisible] = useState(false);
   const [galleryPool, setGalleryPool] = useState([]);
   const [selectedVideos, setSelectedVideos] = useState(new Set());
+  const [syncStatus, setSyncStatus] = useState('Synchronizing Vault...');
+
+  // Status rotation for better UX perceived speed
+  useEffect(() => {
+    if (loading && !isPickerVisible) {
+      const statuses = [
+        'Connecting Media Bridge...',
+        'Mapping Chronological Vault...',
+        'Calibrating Hardware Decoders...',
+        'Securing Private Assets...',
+        'Applying Zero-Copy Logic...'
+      ];
+      let i = 0;
+      const interval = setInterval(() => {
+        setSyncStatus(statuses[i % statuses.length]);
+        i++;
+      }, 1500);
+      return () => clearInterval(interval);
+    }
+  }, [loading, isPickerVisible]);
 
   // Wrapped sync actions that seamlessly drop the Modal overlay prior to executing
   const handleAutoScan = async () => {
@@ -63,9 +85,14 @@ export default function HomeScreen() {
 
   if (loading && !isPickerVisible) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#fff" />
-        <Text style={[styles.text, {marginTop: 15, fontSize: 16}]}>Synchronizing Vault...</Text>
+      <View style={[styles.centered, { backgroundColor: '#000' }]}>
+        <VaultSkeleton />
+        <View style={styles.syncOverlay}>
+           <ActivityIndicator size="small" color="rgba(255,255,255,0.4)" />
+           <Text style={[styles.text, {marginTop: 15, fontSize: 13, letterSpacing: 1, opacity: 0.8}]}>
+             {syncStatus.toUpperCase()}
+           </Text>
+        </View>
       </View>
     );
   }
@@ -295,10 +322,15 @@ const styles = StyleSheet.create({
   },
   centered: {
     flex: 1,
-    backgroundColor: '#000',
-    alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
+    alignItems: 'center',
+    backgroundColor: '#000',
+  },
+  syncOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
   },
   header: {
     position: 'absolute',
