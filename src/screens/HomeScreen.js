@@ -157,18 +157,26 @@ export default function HomeScreen() {
               keyExtractor={item => item.id}
               numColumns={3}
               renderItem={({ item }) => {
+                const isAlreadyInVault = videos.some(v => v.id === item.id);
                 const isSelected = selectedVideos.has(item.id);
+                
                 return (
                   <TouchableOpacity 
-                    style={styles.pickerItem} 
+                    style={[styles.pickerItem, isAlreadyInVault && { opacity: 0.3 }]}
+                    disabled={isAlreadyInVault}
                     onPress={() => toggleVideoSelection(item.id)}
                   >
                     <Image source={{ uri: item.uri }} style={styles.pickerImage} />
-                    {isSelected && (
+                    
+                    {isAlreadyInVault ? (
+                      <View style={styles.selectionOverlay}>
+                        <Ionicons name="lock-closed" size={24} color="rgba(255,255,255,0.7)" />
+                      </View>
+                    ) : isSelected ? (
                       <View style={styles.selectionOverlay}>
                         <Ionicons name="checkmark-circle" size={24} color="#fff" />
                       </View>
-                    )}
+                    ) : null}
                   </TouchableOpacity>
                 );
               }}
