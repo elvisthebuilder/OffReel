@@ -55,9 +55,26 @@ export default function VideoFeed({ videos, defaultFit }) {
                 }, 100);
               }
             } else {
-               // The file was deleted while the app was closed. Fall back safely.
-               console.warn("Ghost File Detected: Last viewed video was deleted natively.");
-               await AsyncStorage.removeItem(LAST_VIDEO_ID_KEY);
+               // Ghost File Detected: Fall back to the NEXT video in the sequence
+               // If it was the very last video, fall back to the PREVIOUS one instead
+               console.warn("Ghost File Detected. Bumping to adjacent timeline spot.");
+               
+               const safeFallbackIndex = (calculatedIndex + 1 < videos.length) 
+                  ? calculatedIndex + 1 
+                  : Math.max(0, calculatedIndex - 1);
+
+               setActiveVideoIndex(safeFallbackIndex);
+               await AsyncStorage.removeItem(LAST_VIDEO_ID_KEY); // Clear the ghost ID
+               
+               // Snap to the safe adjacent video seamlessly
+               if (feedHeight > 0 && flatListRef.current) {
+                setTimeout(() => {
+                  flatListRef.current?.scrollToIndex({
+                    index: safeFallbackIndex,
+                    animated: false
+                  });
+                }, 100);
+              }
             }
           }
         }
