@@ -177,7 +177,7 @@ export const useVideos = () => {
 
   const getManualSelectionPool = async () => {
     try {
-      setLoading(true);
+      // Intentionally bypassed setLoading to prevent main skeleton override
       const pool = await fetchAllGalleryVideos();
       setLoading(false);
       return pool;

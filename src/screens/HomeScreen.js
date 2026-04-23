@@ -24,6 +24,7 @@ export default function HomeScreen() {
 
   const [isSettingsVisible, setIsSettingsVisible] = useState(false);
   const [isPickerVisible, setIsPickerVisible] = useState(false);
+  const [isFetchingPool, setIsFetchingPool] = useState(false);
   const [galleryPool, setGalleryPool] = useState([]);
   const [selectedVideos, setSelectedVideos] = useState(new Set());
   const [syncStatus, setSyncStatus] = useState('Synchronizing Vault...');
@@ -55,10 +56,12 @@ export default function HomeScreen() {
 
   const handleManualPath = async () => {
     setIsSettingsVisible(false);
+    setIsPickerVisible(true);
+    setIsFetchingPool(true);
     const pool = await getManualSelectionPool();
     setGalleryPool(pool);
     setSelectedVideos(new Set());
-    setIsPickerVisible(true);
+    setIsFetchingPool(false);
   };
 
   const handleReset = async () => {
@@ -143,27 +146,34 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
           
-          <FlatList
-            data={galleryPool}
-            keyExtractor={item => item.id}
-            numColumns={3}
-            renderItem={({ item }) => {
-              const isSelected = selectedVideos.has(item.id);
-              return (
-                <TouchableOpacity 
-                  style={styles.pickerItem} 
-                  onPress={() => toggleVideoSelection(item.id)}
-                >
-                  <Image source={{ uri: item.uri }} style={styles.pickerImage} />
-                  {isSelected && (
-                    <View style={styles.selectionOverlay}>
-                      <Ionicons name="checkmark-circle" size={24} color="#fff" />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              );
-            }}
-          />
+          {isFetchingPool ? (
+            <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
+              <ActivityIndicator size="large" color="#fff" />
+              <Text style={{color: '#888', marginTop: 15, fontSize: 13, letterSpacing: 1}}>SCANNING LOCAL MEDIA</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={galleryPool}
+              keyExtractor={item => item.id}
+              numColumns={3}
+              renderItem={({ item }) => {
+                const isSelected = selectedVideos.has(item.id);
+                return (
+                  <TouchableOpacity 
+                    style={styles.pickerItem} 
+                    onPress={() => toggleVideoSelection(item.id)}
+                  >
+                    <Image source={{ uri: item.uri }} style={styles.pickerImage} />
+                    {isSelected && (
+                      <View style={styles.selectionOverlay}>
+                        <Ionicons name="checkmark-circle" size={24} color="#fff" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              }}
+            />
+          )}
         </SafeAreaView>
       </Modal>
     );
