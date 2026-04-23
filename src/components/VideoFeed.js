@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import VideoItem from './VideoItem';
 import FloatingPill from './FloatingPill';
 import VaultSkeleton from './VaultSkeleton';
+import * as FileSystem from 'expo-file-system';
 
 const { height } = Dimensions.get('window');
 const LAST_VIDEO_ID_KEY = '@offreel_last_video_id';
@@ -36,16 +37,27 @@ export default function VideoFeed({ videos, defaultFit }) {
           // Mathematically derive exact array index placement if array sequence changed natively
           const calculatedIndex = videos.findIndex(v => v.id === savedVideoId);
           if (calculatedIndex > -1) {
-            setActiveVideoIndex(calculatedIndex);
             
-            // PRECISE SCROLL: Wait for layout to be measured then snap to exact target
-            if (feedHeight > 0 && flatListRef.current) {
-              setTimeout(() => {
-                flatListRef.current?.scrollToIndex({
-                  index: calculatedIndex,
-                  animated: false
-                });
-              }, 100);
+            // ULTRA-FAST PRE-FLIGHT CHECK: Verify the physical file still exists on the device (takes ~2ms)
+            const videoUri = videos[calculatedIndex].uri;
+            const fileInfo = await FileSystem.getInfoAsync(videoUri);
+            
+            if (fileInfo.exists) {
+              setActiveVideoIndex(calculatedIndex);
+              
+              // PRECISE SCROLL: Wait for layout to be measured then snap to exact target
+              if (feedHeight > 0 && flatListRef.current) {
+                setTimeout(() => {
+                  flatListRef.current?.scrollToIndex({
+                    index: calculatedIndex,
+                    animated: false
+                  });
+                }, 100);
+              }
+            } else {
+               // The file was deleted while the app was closed. Fall back safely.
+               console.warn("Ghost File Detected: Last viewed video was deleted natively.");
+               await AsyncStorage.removeItem(LAST_VIDEO_ID_KEY);
             }
           }
         }
