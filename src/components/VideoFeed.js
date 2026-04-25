@@ -8,106 +8,93 @@ import * as FileSystem from 'expo-file-system';
 const { height } = Dimensions.get('window');
 const LAST_VIDEO_ID_KEY = '@offreel_last_video_id';
 
-export default function VideoFeed({ videos, defaultFit }) {
+export default function VideoFeed({ videos, defaultFit, initialVideoId }) {
   const flatListRef = useRef(null);
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
   const [feedHeight, setFeedHeight] = useState(height);
   const [favorites, setFavorites] = useState(new Set());
+  const [isScrolledToInitial, setIsScrolledToInitial] = useState(false);
 
-  // These refs guard the one-time resume scroll.
-  // Refs (not state) because they must never trigger re-renders.
-  const resumeIndexRef = useRef(-1);   // The target index to scroll to (-1 = not yet resolved)
-  const hasScrolledRef = useRef(false); // True once the scroll fires — never fire again
-  const videosRef = useRef(videos);     // Stable ref to latest videos for async closures
-
-  // Keep videosRef in sync without triggering effects
-  useEffect(() => {
-    videosRef.current = videos;
-  }, [videos]);
+  // Guard refs to prevent re-triggering during background updates
+  const hasAttemptedInitialScroll = useRef(false);
+  const isLayoutReady = useRef(false);
 
   const toggleFavorite = useCallback((assetId) => {
     setFavorites(prev => {
       const next = new Set(prev);
-      if (next.has(assetId)) {
-        next.delete(assetId);
-      } else {
-        next.add(assetId);
-      }
+      if (next.has(assetId)) next.delete(assetId);
+      else next.add(assetId);
       return next;
     });
   }, []);
 
-  // STEP 1: Resolve the target resume index once (when videos first populate)
+  // MASTER SCROLLER: Triggered whenever videos, height, or the target ID changes
   useEffect(() => {
-    if (videos.length === 0 || resumeIndexRef.current !== -1) return;
+    const triggerInitialScroll = async () => {
+      // Requirements for a successful scroll:
+      if (!flatListRef.current) return;
+      if (!isLayoutReady.current) return;
+      if (hasAttemptedInitialScroll.current) return;
+      if (videos.length === 0) return;
+      if (!initialVideoId) {
+        hasAttemptedInitialScroll.current = true;
+        setIsScrolledToInitial(true);
+        return;
+      }
 
-    const resolveResumeTarget = async () => {
+      const targetIndex = videos.findIndex(v => v.id === initialVideoId);
+      if (targetIndex === -1) {
+        hasAttemptedInitialScroll.current = true;
+        setIsScrolledToInitial(true);
+        return;
+      }
+
+      // Mark as done immediately to prevent re-entry
+      hasAttemptedInitialScroll.current = true;
+
+      // Verify the file still exists physically on disk
       try {
-        const savedId = await AsyncStorage.getItem(LAST_VIDEO_ID_KEY);
-        if (!savedId) {
-          resumeIndexRef.current = 0;
-          return;
-        }
+        const fileInfo = await FileSystem.getInfoAsync(videos[targetIndex].uri);
+        const finalIndex = fileInfo.exists ? targetIndex : 0;
+        
+        // konceptually setActive first so the FloatingPill shows the right content
+        setActiveVideoIndex(finalIndex);
 
-        const idx = videosRef.current.findIndex(v => v.id === savedId);
-        if (idx === -1) {
-          resumeIndexRef.current = 0;
-          return;
-        }
+        // Execute the physical snap
+        setTimeout(() => {
+          flatListRef.current?.scrollToIndex({
+            index: finalIndex,
+            animated: false,
+          });
+          setIsScrolledToInitial(true);
+        }, 50); // Minimal shift delay for FlatList internal layout stability
 
-        // Pre-flight: verify file exists
-        const fileInfo = await FileSystem.getInfoAsync(videosRef.current[idx].uri);
-        if (fileInfo.exists) {
-          resumeIndexRef.current = idx;
-          setActiveVideoIndex(idx); // Immediately mark conceptually active (before scroll)
-        } else {
-          // Ghost file: bump to next neighbor
-          console.warn('Ghost File Detected. Bumping to adjacent video.');
-          await AsyncStorage.removeItem(LAST_VIDEO_ID_KEY);
-          const fallback = (idx + 1 < videosRef.current.length) ? idx + 1 : Math.max(0, idx - 1);
-          resumeIndexRef.current = fallback;
-          setActiveVideoIndex(fallback);
-        }
       } catch (e) {
-        console.error('Resume resolution failed:', e);
-        resumeIndexRef.current = 0;
+        console.warn("Resume scan check failed, defaulting to 0:", e);
+        setIsScrolledToInitial(true);
       }
     };
 
-    resolveResumeTarget();
-  }, [videos]);
+    triggerInitialScroll();
+  }, [videos, initialVideoId]);
 
-  // STEP 2: Execute the scroll ONLY after the FlatList is mounted and measured (onLayout)
   const onFeedLayout = useCallback((e) => {
+    isLayoutReady.current = true;
     const measuredHeight = e.nativeEvent.layout.height;
     setFeedHeight(measuredHeight);
-
-    // Attempt scroll only if we haven't done it yet and the target is resolved
-    if (!hasScrolledRef.current && resumeIndexRef.current > 0 && flatListRef.current) {
-      hasScrolledRef.current = true;
-      // Small delay ensures FlatList cells are laid out with the measured height
-      setTimeout(() => {
-        flatListRef.current?.scrollToIndex({
-          index: resumeIndexRef.current,
-          animated: false,
-        });
-      }, 80);
-    }
   }, []);
 
-  // STEP 3: Save current position to AsyncStorage on scroll
+  // TRACK POSITION: Save current video ID to storage as user scrolls
   useEffect(() => {
     const saveCurrentPos = async () => {
-      if (videos.length > 0 && videos[activeVideoIndex]) {
+      // Only start saving AFTER we have successfully resumed our old position
+      if (isScrolledToInitial && videos.length > 0 && videos[activeVideoIndex]) {
         const currentId = videos[activeVideoIndex].id;
-        const savedId = await AsyncStorage.getItem(LAST_VIDEO_ID_KEY);
-        if (currentId !== savedId) {
-          await AsyncStorage.setItem(LAST_VIDEO_ID_KEY, currentId);
-        }
+        await AsyncStorage.setItem(LAST_VIDEO_ID_KEY, currentId);
       }
     };
     saveCurrentPos().catch(console.error);
-  }, [activeVideoIndex, videos]);
+  }, [activeVideoIndex, isScrolledToInitial, videos]);
 
   const onViewableItemsChanged = useCallback(({ viewableItems }) => {
     if (viewableItems.length > 0) {
@@ -140,7 +127,6 @@ export default function VideoFeed({ videos, defaultFit }) {
     );
   }, [activeVideoIndex, feedHeight, defaultFit, favorites, toggleFavorite]);
 
-  // FlatList renders immediately — no isReady gate — FloatingPill always visible
   return (
     <View style={styles.container} onLayout={onFeedLayout}>
       <FlatList
@@ -163,7 +149,7 @@ export default function VideoFeed({ videos, defaultFit }) {
         getItemLayout={getItemLayout}
       />
 
-      {videos.length > 0 && (
+      {videos.length > 0 && isScrolledToInitial && (
         <FloatingPill
           activeAsset={videos[activeVideoIndex]}
           favorites={favorites}

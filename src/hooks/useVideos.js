@@ -3,9 +3,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const VAULT_STORAGE_KEY = '@offreel_vault_videos';
-const APP_MODE_KEY = '@offreel_app_mode';
-const DEFAULT_FIT_KEY = '@offreel_default_fit';
+const LAST_VIDEO_ID_KEY = '@offreel_last_video_id';
 
 export const useVideos = () => {
   const [videos, setVideos] = useState([]);
@@ -13,6 +11,7 @@ export const useVideos = () => {
   const [error, setError] = useState(null);
   const [appMode, setAppMode] = useState(null);
   const [defaultFit, setDefaultFit] = useState("cover");
+  const [initialVideoId, setInitialVideoId] = useState(null);
 
   useEffect(() => {
     const bootApp = async () => {
@@ -24,6 +23,9 @@ export const useVideos = () => {
         if (savedFit) {
           setDefaultFit(savedFit);
         }
+
+        const lastId = await AsyncStorage.getItem(LAST_VIDEO_ID_KEY);
+        setInitialVideoId(lastId);
         
         if (savedMode === 'auto') {
           // INSTANT RESUME: Load the cached gallery map first to get the UI ready immediately
@@ -223,6 +225,7 @@ export const useVideos = () => {
     error, 
     appMode, 
     defaultFit, 
+    initialVideoId,
     changeDefaultFit, 
     getManualSelectionPool, 
     addManualVideos, 

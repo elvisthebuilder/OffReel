@@ -15,6 +15,7 @@ export default function HomeScreen() {
     error, 
     appMode, 
     defaultFit, 
+    initialVideoId,
     changeDefaultFit, 
     getManualSelectionPool, 
     addManualVideos, 
@@ -196,7 +197,11 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       {/* Passing global settings layout efficiently beneath to structure raw render configs */}
-      <VideoFeed videos={videos} defaultFit={defaultFit} />
+      <VideoFeed 
+        videos={videos} 
+        defaultFit={defaultFit} 
+        initialVideoId={initialVideoId}
+      />
       
       <SafeAreaView style={styles.header} edges={['top']} pointerEvents="none">
         <Text style={styles.headerText}>OffReel</Text>
