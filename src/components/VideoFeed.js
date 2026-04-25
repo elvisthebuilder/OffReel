@@ -1,9 +1,8 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { FlatList, StyleSheet, Dimensions, View, ActivityIndicator } from 'react-native';
+import { FlatList, StyleSheet, Dimensions, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import VideoItem from './VideoItem';
 import FloatingPill from './FloatingPill';
-import VaultSkeleton from './VaultSkeleton';
 import * as FileSystem from 'expo-file-system';
 
 const { height } = Dimensions.get('window');
@@ -13,9 +12,18 @@ export default function VideoFeed({ videos, defaultFit }) {
   const flatListRef = useRef(null);
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
   const [feedHeight, setFeedHeight] = useState(height);
-  const [isReady, setIsReady] = useState(false);
   const [favorites, setFavorites] = useState(new Set());
-  const hasRestoredPosition = useRef(false); // Guard: only restore once per session
+
+  // These refs guard the one-time resume scroll.
+  // Refs (not state) because they must never trigger re-renders.
+  const resumeIndexRef = useRef(-1);   // The target index to scroll to (-1 = not yet resolved)
+  const hasScrolledRef = useRef(false); // True once the scroll fires — never fire again
+  const videosRef = useRef(videos);     // Stable ref to latest videos for async closures
+
+  // Keep videosRef in sync without triggering effects
+  useEffect(() => {
+    videosRef.current = videos;
+  }, [videos]);
 
   const toggleFavorite = useCallback((assetId) => {
     setFavorites(prev => {
@@ -29,89 +37,77 @@ export default function VideoFeed({ videos, defaultFit }) {
     });
   }, []);
 
-  // Load physical ID dynamically against shifting indexes natively
+  // STEP 1: Resolve the target resume index once (when videos first populate)
   useEffect(() => {
-    const loadSavedVideo = async () => {
-      try {
-        const savedVideoId = await AsyncStorage.getItem(LAST_VIDEO_ID_KEY);
-        if (savedVideoId !== null) {
-          // Mathematically derive exact array index placement if array sequence changed natively
-          const calculatedIndex = videos.findIndex(v => v.id === savedVideoId);
-          if (calculatedIndex > -1) {
-            
-            // ULTRA-FAST PRE-FLIGHT CHECK: Verify the physical file still exists on the device (takes ~2ms)
-            const videoUri = videos[calculatedIndex].uri;
-            const fileInfo = await FileSystem.getInfoAsync(videoUri);
-            
-            if (fileInfo.exists) {
-              setActiveVideoIndex(calculatedIndex);
-              
-              // PRECISE SCROLL: Wait for layout to be measured then snap to exact target
-              if (feedHeight > 0 && flatListRef.current) {
-                setTimeout(() => {
-                  flatListRef.current?.scrollToIndex({
-                    index: calculatedIndex,
-                    animated: false
-                  });
-                }, 100);
-              }
-            } else {
-               // Ghost File Detected: Fall back to the NEXT video in the sequence
-               // If it was the very last video, fall back to the PREVIOUS one instead
-               console.warn("Ghost File Detected. Bumping to adjacent timeline spot.");
-               
-               const safeFallbackIndex = (calculatedIndex + 1 < videos.length) 
-                  ? calculatedIndex + 1 
-                  : Math.max(0, calculatedIndex - 1);
+    if (videos.length === 0 || resumeIndexRef.current !== -1) return;
 
-               setActiveVideoIndex(safeFallbackIndex);
-               await AsyncStorage.removeItem(LAST_VIDEO_ID_KEY); // Clear the ghost ID
-               
-               // Snap to the safe adjacent video seamlessly
-               if (feedHeight > 0 && flatListRef.current) {
-                setTimeout(() => {
-                  flatListRef.current?.scrollToIndex({
-                    index: safeFallbackIndex,
-                    animated: false
-                  });
-                }, 100);
-              }
-            }
-          }
+    const resolveResumeTarget = async () => {
+      try {
+        const savedId = await AsyncStorage.getItem(LAST_VIDEO_ID_KEY);
+        if (!savedId) {
+          resumeIndexRef.current = 0;
+          return;
+        }
+
+        const idx = videosRef.current.findIndex(v => v.id === savedId);
+        if (idx === -1) {
+          resumeIndexRef.current = 0;
+          return;
+        }
+
+        // Pre-flight: verify file exists
+        const fileInfo = await FileSystem.getInfoAsync(videosRef.current[idx].uri);
+        if (fileInfo.exists) {
+          resumeIndexRef.current = idx;
+          setActiveVideoIndex(idx); // Immediately mark conceptually active (before scroll)
+        } else {
+          // Ghost file: bump to next neighbor
+          console.warn('Ghost File Detected. Bumping to adjacent video.');
+          await AsyncStorage.removeItem(LAST_VIDEO_ID_KEY);
+          const fallback = (idx + 1 < videosRef.current.length) ? idx + 1 : Math.max(0, idx - 1);
+          resumeIndexRef.current = fallback;
+          setActiveVideoIndex(fallback);
         }
       } catch (e) {
-        console.error("Failed to load last ID securely", e);
-      } finally {
-        setIsReady(true);
+        console.error('Resume resolution failed:', e);
+        resumeIndexRef.current = 0;
       }
     };
-    
-    if (videos.length > 0 && !hasRestoredPosition.current) {
-      hasRestoredPosition.current = true; // Lock: never run again this session
-      loadSavedVideo();
-    } else if (videos.length > 0 && isReady) {
-      // Background sync updated videos — keep user at current ID position
-      // (activeVideoIndex is already correct; no action needed)
-    } else if (videos.length === 0) {
-      setIsReady(true);
-    }
-  }, [videos]); // Only re-run when videos changes, but guard prevents re-restore
 
-  // Safely index currently viewing Video ID — STRICT REPLACEMENT ONLY
+    resolveResumeTarget();
+  }, [videos]);
+
+  // STEP 2: Execute the scroll ONLY after the FlatList is mounted and measured (onLayout)
+  const onFeedLayout = useCallback((e) => {
+    const measuredHeight = e.nativeEvent.layout.height;
+    setFeedHeight(measuredHeight);
+
+    // Attempt scroll only if we haven't done it yet and the target is resolved
+    if (!hasScrolledRef.current && resumeIndexRef.current > 0 && flatListRef.current) {
+      hasScrolledRef.current = true;
+      // Small delay ensures FlatList cells are laid out with the measured height
+      setTimeout(() => {
+        flatListRef.current?.scrollToIndex({
+          index: resumeIndexRef.current,
+          animated: false,
+        });
+      }, 80);
+    }
+  }, []);
+
+  // STEP 3: Save current position to AsyncStorage on scroll
   useEffect(() => {
     const saveCurrentPos = async () => {
-        if (isReady && videos.length > 0 && videos[activeVideoIndex]) {
-            const currentId = videos[activeVideoIndex].id;
-            const savedId = await AsyncStorage.getItem(LAST_VIDEO_ID_KEY);
-            
-            // Only write to disk if the ID has actually changed (saves battery/wear)
-            if (currentId !== savedId) {
-                await AsyncStorage.setItem(LAST_VIDEO_ID_KEY, currentId);
-            }
+      if (videos.length > 0 && videos[activeVideoIndex]) {
+        const currentId = videos[activeVideoIndex].id;
+        const savedId = await AsyncStorage.getItem(LAST_VIDEO_ID_KEY);
+        if (currentId !== savedId) {
+          await AsyncStorage.setItem(LAST_VIDEO_ID_KEY, currentId);
         }
+      }
     };
     saveCurrentPos().catch(console.error);
-  }, [activeVideoIndex, isReady, videos]);
+  }, [activeVideoIndex, videos]);
 
   const onViewableItemsChanged = useCallback(({ viewableItems }) => {
     if (viewableItems.length > 0) {
@@ -120,18 +116,17 @@ export default function VideoFeed({ videos, defaultFit }) {
   }, []);
 
   const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 80, // Tighten threshold to ensure strictly focused player triggering
+    itemVisiblePercentThreshold: 80,
   }).current;
 
-  const getItemLayout = (data, index) => ({
+  const getItemLayout = useCallback((data, index) => ({
     length: feedHeight,
     offset: feedHeight * index,
     index,
-  });
+  }), [feedHeight]);
 
-  const renderItem = ({ item, index }) => {
+  const renderItem = useCallback(({ item, index }) => {
     const isVisible = Math.abs(index - activeVideoIndex) <= 1;
-
     return (
       <VideoItem
         asset={item}
@@ -143,21 +138,11 @@ export default function VideoFeed({ videos, defaultFit }) {
         onDoubleTapLike={() => toggleFavorite(item.id)}
       />
     );
-  };
+  }, [activeVideoIndex, feedHeight, defaultFit, favorites, toggleFavorite]);
 
-  if (!isReady) {
-    return (
-      <View style={styles.container}>
-        <VaultSkeleton />
-      </View>
-    );
-  }
-
+  // FlatList renders immediately — no isReady gate — FloatingPill always visible
   return (
-    <View 
-      style={styles.container} 
-      onLayout={(e) => setFeedHeight(e.nativeEvent.layout.height)}
-    >
+    <View style={styles.container} onLayout={onFeedLayout}>
       <FlatList
         ref={flatListRef}
         data={videos}
@@ -172,13 +157,12 @@ export default function VideoFeed({ videos, defaultFit }) {
         viewabilityConfig={viewabilityConfig}
         initialNumToRender={1}
         maxToRenderPerBatch={1}
-        windowSize={2} // Reduced to current + 1 neighbor to minimize memory pressure
+        windowSize={2}
         removeClippedSubviews={true}
-        updateCellsBatchingPeriod={50} // Hardened throttle to prevent decoder contention
+        updateCellsBatchingPeriod={50}
         getItemLayout={getItemLayout}
-        // Removing initialScrollIndex in favor of the more reliable Precise Scroll Engine
       />
-      
+
       {videos.length > 0 && (
         <FloatingPill
           activeAsset={videos[activeVideoIndex]}
