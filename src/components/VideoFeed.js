@@ -15,6 +15,7 @@ export default function VideoFeed({ videos, defaultFit }) {
   const [feedHeight, setFeedHeight] = useState(height);
   const [isReady, setIsReady] = useState(false);
   const [favorites, setFavorites] = useState(new Set());
+  const hasRestoredPosition = useRef(false); // Guard: only restore once per session
 
   const toggleFavorite = useCallback((assetId) => {
     setFavorites(prev => {
@@ -85,12 +86,16 @@ export default function VideoFeed({ videos, defaultFit }) {
       }
     };
     
-    if (videos.length > 0) {
+    if (videos.length > 0 && !hasRestoredPosition.current) {
+      hasRestoredPosition.current = true; // Lock: never run again this session
       loadSavedVideo();
-    } else {
+    } else if (videos.length > 0 && isReady) {
+      // Background sync updated videos — keep user at current ID position
+      // (activeVideoIndex is already correct; no action needed)
+    } else if (videos.length === 0) {
       setIsReady(true);
     }
-  }, [videos, feedHeight]); // Re-run if layout changes to ensure math is perfect
+  }, [videos]); // Only re-run when videos changes, but guard prevents re-restore
 
   // Safely index currently viewing Video ID — STRICT REPLACEMENT ONLY
   useEffect(() => {

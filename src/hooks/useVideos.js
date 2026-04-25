@@ -151,12 +151,25 @@ export const useVideos = () => {
   const silentAutoScanGallery = async (shouldSetLoading = false) => {
     try {
       if (shouldSetLoading) setLoading(true);
-      const allVideos = await fetchAllGalleryVideos();
-      if (allVideos.length === 0) throw new Error("Vault is physically empty.");
+      const freshVideos = await fetchAllGalleryVideos();
+      if (freshVideos.length === 0) throw new Error("Vault is physically empty.");
       
-      setVideos(allVideos);
-      // Persist the map for instant resume on next launch
-      await AsyncStorage.setItem(VAULT_STORAGE_KEY, JSON.stringify(allVideos));
+      // SMART MERGE: Never nuke the existing array — only append genuinely new videos
+      // This preserves the user's active scroll position and FloatingPill state
+      setVideos(prev => {
+        const existingIds = new Set(prev.map(v => v.id));
+        const newOnes = freshVideos.filter(v => !existingIds.has(v.id));
+        
+        if (newOnes.length === 0) return prev; // No changes — return same reference (no re-render)
+        
+        // Insert new videos after the last known video chronologically
+        const merged = [...prev, ...newOnes];
+        
+        // Persist the merged result for next instant-resume
+        AsyncStorage.setItem(VAULT_STORAGE_KEY, JSON.stringify(merged)).catch(console.error);
+        
+        return merged;
+      });
     } catch (err) {
       console.error('Background auto-scan silently failed:', err);
     } finally {
