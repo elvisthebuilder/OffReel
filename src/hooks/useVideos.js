@@ -3,6 +3,9 @@ import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+const VAULT_STORAGE_KEY = '@offreel_vault_videos';
+const APP_MODE_KEY = '@offreel_app_mode';
+const DEFAULT_FIT_KEY = '@offreel_default_fit';
 const LAST_VIDEO_ID_KEY = '@offreel_last_video_id';
 
 export const useVideos = () => {
