@@ -13,11 +13,11 @@ export default function VideoFeed({ videos, defaultFit, initialVideoId }) {
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
   const [feedHeight, setFeedHeight] = useState(height);
   const [favorites, setFavorites] = useState(new Set());
+  
+  // States to coordinate the resume scroll
+  const [layoutMeasured, setLayoutMeasured] = useState(false);
   const [isScrolledToInitial, setIsScrolledToInitial] = useState(false);
-
-  // Guard refs to prevent re-triggering during background updates
   const hasAttemptedInitialScroll = useRef(false);
-  const isLayoutReady = useRef(false);
 
   const toggleFavorite = useCallback((assetId) => {
     setFavorites(prev => {
@@ -28,67 +28,60 @@ export default function VideoFeed({ videos, defaultFit, initialVideoId }) {
     });
   }, []);
 
-  // MASTER SCROLLER: Triggered whenever videos, height, or the target ID changes
+  // SCROLL ENGINE: Listens for both layout measurement AND video data
   useEffect(() => {
-    const triggerInitialScroll = async () => {
-      // Requirements for a successful scroll:
-      if (!flatListRef.current) return;
-      if (!isLayoutReady.current) return;
-      if (hasAttemptedInitialScroll.current) return;
-      if (videos.length === 0) return;
+    if (!layoutMeasured || videos.length === 0 || hasAttemptedInitialScroll.current) return;
+
+    const performResume = async () => {
+      hasAttemptedInitialScroll.current = true; // Lock immediately
+
       if (!initialVideoId) {
-        hasAttemptedInitialScroll.current = true;
         setIsScrolledToInitial(true);
         return;
       }
 
       const targetIndex = videos.findIndex(v => v.id === initialVideoId);
-      if (targetIndex === -1) {
-        hasAttemptedInitialScroll.current = true;
+      if (targetIndex <= 0) { // 0 is default anyway
         setIsScrolledToInitial(true);
         return;
       }
 
-      // Mark as done immediately to prevent re-entry
-      hasAttemptedInitialScroll.current = true;
-
-      // Verify the file still exists physically on disk
       try {
+        // Double-check file existence
         const fileInfo = await FileSystem.getInfoAsync(videos[targetIndex].uri);
         const finalIndex = fileInfo.exists ? targetIndex : 0;
         
-        // konceptually setActive first so the FloatingPill shows the right content
         setActiveVideoIndex(finalIndex);
 
-        // Execute the physical snap
+        // Snap the list to the index
         setTimeout(() => {
           flatListRef.current?.scrollToIndex({
             index: finalIndex,
             animated: false,
           });
-          setIsScrolledToInitial(true);
-        }, 50); // Minimal shift delay for FlatList internal layout stability
-
+          // Small delay before allowing position saving to prevent index-0 overwrite
+          setTimeout(() => setIsScrolledToInitial(true), 100);
+        }, 32); 
       } catch (e) {
-        console.warn("Resume scan check failed, defaulting to 0:", e);
         setIsScrolledToInitial(true);
       }
     };
 
-    triggerInitialScroll();
-  }, [videos, initialVideoId]);
+    performResume();
+  }, [layoutMeasured, videos, initialVideoId]);
 
   const onFeedLayout = useCallback((e) => {
-    isLayoutReady.current = true;
     const measuredHeight = e.nativeEvent.layout.height;
     setFeedHeight(measuredHeight);
+    setLayoutMeasured(true);
   }, []);
 
-  // TRACK POSITION: Save current video ID to storage as user scrolls
+  // SAVE POSITION: Only writes to storage AFTER the initial resume is complete
   useEffect(() => {
+    if (!isScrolledToInitial) return;
+
     const saveCurrentPos = async () => {
-      // Only start saving AFTER we have successfully resumed our old position
-      if (isScrolledToInitial && videos.length > 0 && videos[activeVideoIndex]) {
+      if (videos[activeVideoIndex]) {
         const currentId = videos[activeVideoIndex].id;
         await AsyncStorage.setItem(LAST_VIDEO_ID_KEY, currentId);
       }
@@ -149,7 +142,8 @@ export default function VideoFeed({ videos, defaultFit, initialVideoId }) {
         getItemLayout={getItemLayout}
       />
 
-      {videos.length > 0 && isScrolledToInitial && (
+      {/* Dock (FloatingPill) now visible immediately for better UX */}
+      {videos.length > 0 && (
         <FloatingPill
           activeAsset={videos[activeVideoIndex]}
           favorites={favorites}
