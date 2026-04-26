@@ -1,9 +1,8 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { FlatList, StyleSheet, Dimensions, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import VideoItem from './VideoItem';
 import FloatingPill from './FloatingPill';
-import * as FileSystem from 'expo-file-system';
 
 const { height } = Dimensions.get('window');
 const LAST_VIDEO_ID_KEY = '@offreel_last_video_id';
@@ -14,10 +13,29 @@ export default function VideoFeed({ videos, defaultFit, initialVideoId }) {
   const [feedHeight, setFeedHeight] = useState(height);
   const [favorites, setFavorites] = useState(new Set());
   
-  // States to coordinate the resume scroll
-  const [layoutMeasured, setLayoutMeasured] = useState(false);
-  const [isScrolledToInitial, setIsScrolledToInitial] = useState(false);
-  const hasAttemptedInitialScroll = useRef(false);
+  // Track if we've stabilized at our starting position
+  const [isReadyForSaving, setIsReadyForSaving] = useState(false);
+
+  // PRE-CALCULATE STARTING INDEX: This is the most robust way to resume.
+  // We determine the index BEFORE the FlatList mounts.
+  const startingIndex = useMemo(() => {
+    if (!initialVideoId || videos.length === 0) return 0;
+    const idx = videos.findIndex(v => v.id === initialVideoId);
+    return idx >= 0 ? idx : 0;
+  }, [videos, initialVideoId]);
+
+  // Synchronize the active index state with our calculated starting index on mount
+  useEffect(() => {
+    if (activeVideoIndex === 0 && startingIndex > 0) {
+      setActiveVideoIndex(startingIndex);
+    }
+    
+    // Give the UI a moment to breathe before we start recording new positions
+    const timer = setTimeout(() => {
+      setIsReadyForSaving(true);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [startingIndex]);
 
   const toggleFavorite = useCallback((assetId) => {
     setFavorites(prev => {
@@ -28,57 +46,9 @@ export default function VideoFeed({ videos, defaultFit, initialVideoId }) {
     });
   }, []);
 
-  // SCROLL ENGINE: Listens for both layout measurement AND video data
+  // SAVE POSITION: Only trigger after the initial resume window is closed
   useEffect(() => {
-    if (!layoutMeasured || videos.length === 0 || hasAttemptedInitialScroll.current) return;
-
-    const performResume = async () => {
-      hasAttemptedInitialScroll.current = true; // Lock immediately
-
-      if (!initialVideoId) {
-        setIsScrolledToInitial(true);
-        return;
-      }
-
-      const targetIndex = videos.findIndex(v => v.id === initialVideoId);
-      if (targetIndex <= 0) { // 0 is default anyway
-        setIsScrolledToInitial(true);
-        return;
-      }
-
-      try {
-        // Double-check file existence
-        const fileInfo = await FileSystem.getInfoAsync(videos[targetIndex].uri);
-        const finalIndex = fileInfo.exists ? targetIndex : 0;
-        
-        setActiveVideoIndex(finalIndex);
-
-        // Snap the list to the index
-        setTimeout(() => {
-          flatListRef.current?.scrollToIndex({
-            index: finalIndex,
-            animated: false,
-          });
-          // Small delay before allowing position saving to prevent index-0 overwrite
-          setTimeout(() => setIsScrolledToInitial(true), 100);
-        }, 32); 
-      } catch (e) {
-        setIsScrolledToInitial(true);
-      }
-    };
-
-    performResume();
-  }, [layoutMeasured, videos, initialVideoId]);
-
-  const onFeedLayout = useCallback((e) => {
-    const measuredHeight = e.nativeEvent.layout.height;
-    setFeedHeight(measuredHeight);
-    setLayoutMeasured(true);
-  }, []);
-
-  // SAVE POSITION: Only writes to storage AFTER the initial resume is complete
-  useEffect(() => {
-    if (!isScrolledToInitial) return;
+    if (!isReadyForSaving) return;
 
     const saveCurrentPos = async () => {
       if (videos[activeVideoIndex]) {
@@ -87,7 +57,7 @@ export default function VideoFeed({ videos, defaultFit, initialVideoId }) {
       }
     };
     saveCurrentPos().catch(console.error);
-  }, [activeVideoIndex, isScrolledToInitial, videos]);
+  }, [activeVideoIndex, isReadyForSaving, videos]);
 
   const onViewableItemsChanged = useCallback(({ viewableItems }) => {
     if (viewableItems.length > 0) {
@@ -120,6 +90,16 @@ export default function VideoFeed({ videos, defaultFit, initialVideoId }) {
     );
   }, [activeVideoIndex, feedHeight, defaultFit, favorites, toggleFavorite]);
 
+  const onFeedLayout = useCallback((e) => {
+    const measuredHeight = e.nativeEvent.layout.height;
+    if (measuredHeight > 0) {
+      setFeedHeight(measuredHeight);
+    }
+  }, []);
+
+  // Return null or skeleton if we have no videos yet
+  if (videos.length === 0) return null;
+
   return (
     <View style={styles.container} onLayout={onFeedLayout}>
       <FlatList
@@ -140,16 +120,23 @@ export default function VideoFeed({ videos, defaultFit, initialVideoId }) {
         removeClippedSubviews={true}
         updateCellsBatchingPeriod={50}
         getItemLayout={getItemLayout}
+        
+        // NATIVE RESUME: This is the secret sauce. 
+        // It skips the 'Index 0' flash and starts exactly where we need to be.
+        initialScrollIndex={startingIndex}
+        onScrollToIndexFailed={info => {
+            // Fallback if the list isn't ready for this index yet
+            setTimeout(() => {
+                flatListRef.current?.scrollToIndex({ index: info.index, animated: false });
+            }, 100);
+        }}
       />
 
-      {/* Dock (FloatingPill) now visible immediately for better UX */}
-      {videos.length > 0 && (
-        <FloatingPill
-          activeAsset={videos[activeVideoIndex]}
-          favorites={favorites}
-          onToggleFavorite={toggleFavorite}
-        />
-      )}
+      <FloatingPill
+        activeAsset={videos[activeVideoIndex]}
+        favorites={favorites}
+        onToggleFavorite={toggleFavorite}
+      />
     </View>
   );
 }
