@@ -1,7 +1,7 @@
 # 🎬 OffReel — Immersive Offline Video Vault & Feed
 
-[![OffReel Website](https://img.shields.io/badge/Official_Website-offreel.io-000000?style=for-the-badge&logo=google-chrome&logoColor=white)](https://github.com/elvisthebuilder/OffReelSite)
-[![Latest Release](https://img.shields.io/badge/Download_Latest-v1.2.1-34C759?style=for-the-badge&logo=android&logoColor=white)](https://github.com/elvisthebuilder/OffReelSite/tree/master/downloads)
+[![OffReel Website](https://img.shields.io/badge/Official_Website-offreel.vercel.app-000000?style=for-the-badge&logo=google-chrome&logoColor=white)](https://offreel.vercel.app/)
+[![Latest Release](https://img.shields.io/badge/Download_Latest-v1.2.1-34C759?style=for-the-badge&logo=android&logoColor=white)](https://offreel.vercel.app/)
 [![Discord Server](https://img.shields.io/badge/Join_Discord-Community-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/5QYH4xaS)
 
 **OffReel** is a beautiful, offline-first mobile app that turns your phone's local video gallery into a dynamic, zero-latency vertical feed. Experience your own personal videos with the same fluid, continuous swipe mechanics as modern social platforms—**with 100% privacy, zero algorithms, and zero ads.**
@@ -27,7 +27,7 @@
 OffReel is currently distributed as a standalone, zero-bloat Android package (.APK) for maximum control and privacy.
 
 1. **Download the APK:**
-   Visit our [Official Landing Page & Release Hub](https://github.com/elvisthebuilder/OffReelSite) or download the latest package directly from our **[Release Hub Downloads Folder](https://github.com/elvisthebuilder/OffReelSite/tree/master/downloads/offreel-1.2.1.apk)**.
+   Visit our [Official Landing Page & Release Hub](https://offreel.vercel.app/) or download the latest package directly: **[Download OffReel v1.2.1 APK](https://offreel.vercel.app/downloads/offreel-1.2.1.apk)**.
 2. **Allow Unknown Sources:**
    If your phone prompts you about installing applications from "Unknown Sources" or your web browser, tap **Settings** in the prompt and enable **"Allow from this source"**.
 3. **Install:**
