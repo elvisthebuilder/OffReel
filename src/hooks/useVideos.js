@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { AppState } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -55,32 +56,50 @@ export const useVideos = () => {
     bootApp();
   }, []);
 
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState) => {
+      if (nextAppState === 'active') {
+        if (appMode === 'auto') {
+          silentAutoScanGallery(false);
+        } else if (appMode === 'manual') {
+          loadManualVault();
+        }
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+    return () => {
+      subscription.remove();
+    };
+  }, [appMode]);
+
   const loadManualVault = async () => {
     try {
       const storedVideos = await AsyncStorage.getItem(VAULT_STORAGE_KEY);
       if (storedVideos) {
         const parsed = JSON.parse(storedVideos);
         
-        const verifiedVideos = (await Promise.all(
-          parsed.map(async (video) => {
-            try {
-              // Direct ID parity check: if it's a native asset, it's already "synced"
-              // We only verify existence for items that have a specific system ID
-              if (video.id && !video.id.startsWith('video-')) {
-                 // We don't need getAssetInfoAsync for every boot unless we need new metadata
-                 // Just being in the parsed list is enough if it's a native ID
-                 return video;
-              }
-              return video;
-            } catch (e) {
-              return null;
-            }
-          })
-        )).filter(v => v !== null);
+        // Fetch physically present gallery assets to filter out manually selected videos that have been deleted
+        let freshIds = new Set();
+        try {
+          const freshAssets = await fetchAllGalleryVideos();
+          freshIds = new Set(freshAssets.map(v => v.id));
+        } catch (e) {
+          console.warn("Could not fetch gallery assets for validation:", e);
+        }
+
+        const verifiedVideos = parsed.filter(video => {
+          // If it's a native asset (i.e. not a custom video- uri), verify it still exists physically
+          if (video.id && !video.id.startsWith('video-')) {
+            return freshIds.has(video.id);
+          }
+          return true;
+        });
 
         setVideos(verifiedVideos);
         if (verifiedVideos.length < parsed.length) {
-             await AsyncStorage.setItem(VAULT_STORAGE_KEY, JSON.stringify(verifiedVideos));
+          await AsyncStorage.setItem(VAULT_STORAGE_KEY, JSON.stringify(verifiedVideos));
         }
       }
     } catch (err) {
@@ -157,20 +176,31 @@ export const useVideos = () => {
     try {
       if (shouldSetLoading) setLoading(true);
       const freshVideos = await fetchAllGalleryVideos();
-      if (freshVideos.length === 0) throw new Error("Vault is physically empty.");
       
-      // SMART MERGE: Never nuke the existing array — only append genuinely new videos
-      // This preserves the user's active scroll position and FloatingPill state
+      // If gallery is empty on device, clear videos and save
+      if (freshVideos.length === 0) {
+        setVideos([]);
+        await AsyncStorage.setItem(VAULT_STORAGE_KEY, JSON.stringify([]));
+        return;
+      }
+      
+      const freshIds = new Set(freshVideos.map(v => v.id));
+      
       setVideos(prev => {
-        const existingIds = new Set(prev.map(v => v.id));
+        // Filter out cached videos that no longer exist in the physical gallery
+        const filteredPrev = prev.filter(v => freshIds.has(v.id));
+        
+        const existingIds = new Set(filteredPrev.map(v => v.id));
         const newOnes = freshVideos.filter(v => !existingIds.has(v.id));
         
-        if (newOnes.length === 0) return prev; // No changes — return same reference (no re-render)
+        // If nothing was added AND nothing was deleted, preserve reference
+        if (newOnes.length === 0 && filteredPrev.length === prev.length) {
+          return prev;
+        }
         
-        // Insert new videos after the last known video chronologically
-        const merged = [...prev, ...newOnes];
+        const merged = [...filteredPrev, ...newOnes];
         
-        // Persist the merged result for next instant-resume
+        // Persist the synced result
         AsyncStorage.setItem(VAULT_STORAGE_KEY, JSON.stringify(merged)).catch(console.error);
         
         return merged;
