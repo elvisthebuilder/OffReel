@@ -1,8 +1,9 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { FlatList, StyleSheet, Dimensions, View } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import VideoItem from './VideoItem';
+
 import FloatingPill from './FloatingPill';
+import VideoItem from './VideoItem';
 
 const { height } = Dimensions.get('window');
 const LAST_VIDEO_ID_KEY = '@offreel_last_video_id';
@@ -12,7 +13,7 @@ export default function VideoFeed({ videos, defaultFit, initialVideoId }) {
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
   const [feedHeight, setFeedHeight] = useState(height);
   const [favorites, setFavorites] = useState(new Set());
-  
+
   // Track if we've stabilized at our starting position
   const [isReadyForSaving, setIsReadyForSaving] = useState(false);
 
@@ -20,7 +21,7 @@ export default function VideoFeed({ videos, defaultFit, initialVideoId }) {
   // We determine the index BEFORE the FlatList mounts.
   const startingIndex = useMemo(() => {
     if (!initialVideoId || videos.length === 0) return 0;
-    const idx = videos.findIndex(v => v.id === initialVideoId);
+    const idx = videos.findIndex((v) => v.id === initialVideoId);
     return idx >= 0 ? idx : 0;
   }, [videos, initialVideoId]);
 
@@ -29,16 +30,16 @@ export default function VideoFeed({ videos, defaultFit, initialVideoId }) {
     if (activeVideoIndex === 0 && startingIndex > 0) {
       setActiveVideoIndex(startingIndex);
     }
-    
+
     // Give the UI a moment to breathe before we start recording new positions
     const timer = setTimeout(() => {
       setIsReadyForSaving(true);
     }, 1000);
     return () => clearTimeout(timer);
-  }, [startingIndex]);
+  }, [startingIndex, activeVideoIndex]);
 
   const toggleFavorite = useCallback((assetId) => {
-    setFavorites(prev => {
+    setFavorites((prev) => {
       const next = new Set(prev);
       if (next.has(assetId)) next.delete(assetId);
       else next.add(assetId);
@@ -69,26 +70,32 @@ export default function VideoFeed({ videos, defaultFit, initialVideoId }) {
     itemVisiblePercentThreshold: 80,
   }).current;
 
-  const getItemLayout = useCallback((data, index) => ({
-    length: feedHeight,
-    offset: feedHeight * index,
-    index,
-  }), [feedHeight]);
+  const getItemLayout = useCallback(
+    (data, index) => ({
+      length: feedHeight,
+      offset: feedHeight * index,
+      index,
+    }),
+    [feedHeight]
+  );
 
-  const renderItem = useCallback(({ item, index }) => {
-    const isVisible = Math.abs(index - activeVideoIndex) <= 1;
-    return (
-      <VideoItem
-        asset={item}
-        isActive={index === activeVideoIndex}
-        isVisible={isVisible}
-        feedHeight={feedHeight}
-        defaultFit={defaultFit}
-        isLiked={favorites.has(item.id)}
-        onDoubleTapLike={() => toggleFavorite(item.id)}
-      />
-    );
-  }, [activeVideoIndex, feedHeight, defaultFit, favorites, toggleFavorite]);
+  const renderItem = useCallback(
+    ({ item, index }) => {
+      const isVisible = Math.abs(index - activeVideoIndex) <= 1;
+      return (
+        <VideoItem
+          asset={item}
+          isActive={index === activeVideoIndex}
+          isVisible={isVisible}
+          feedHeight={feedHeight}
+          defaultFit={defaultFit}
+          isLiked={favorites.has(item.id)}
+          onDoubleTapLike={() => toggleFavorite(item.id)}
+        />
+      );
+    },
+    [activeVideoIndex, feedHeight, defaultFit, favorites, toggleFavorite]
+  );
 
   const onFeedLayout = useCallback((e) => {
     const measuredHeight = e.nativeEvent.layout.height;
@@ -106,7 +113,7 @@ export default function VideoFeed({ videos, defaultFit, initialVideoId }) {
         ref={flatListRef}
         data={videos}
         renderItem={renderItem}
-        keyExtractor={item => item.id}
+        keyExtractor={(item) => item.id}
         pagingEnabled
         showsVerticalScrollIndicator={false}
         snapToInterval={feedHeight}
@@ -117,18 +124,17 @@ export default function VideoFeed({ videos, defaultFit, initialVideoId }) {
         initialNumToRender={1}
         maxToRenderPerBatch={1}
         windowSize={2}
-        removeClippedSubviews={true}
+        removeClippedSubviews
         updateCellsBatchingPeriod={50}
         getItemLayout={getItemLayout}
-        
-        // NATIVE RESUME: This is the secret sauce. 
+        // NATIVE RESUME: This is the secret sauce.
         // It skips the 'Index 0' flash and starts exactly where we need to be.
         initialScrollIndex={startingIndex}
-        onScrollToIndexFailed={info => {
-            // Fallback if the list isn't ready for this index yet
-            setTimeout(() => {
-                flatListRef.current?.scrollToIndex({ index: info.index, animated: false });
-            }, 100);
+        onScrollToIndexFailed={(info) => {
+          // Fallback if the list isn't ready for this index yet
+          setTimeout(() => {
+            flatListRef.current?.scrollToIndex({ index: info.index, animated: false });
+          }, 100);
         }}
       />
 

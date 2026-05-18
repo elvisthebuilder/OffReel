@@ -1,8 +1,9 @@
+import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import * as MediaLibrary from 'expo-media-library';
+import * as Sharing from 'expo-sharing';
 import React, { useState } from 'react';
 import { StyleSheet, View, TouchableOpacity, Alert, Modal, Text, Pressable } from 'react-native';
-import * as Haptics from 'expo-haptics';
-import { Ionicons } from '@expo/vector-icons';
-import * as Sharing from 'expo-sharing';
 
 export default function FloatingPill({ activeAsset, favorites, onToggleFavorite }) {
   const [modalVisible, setModalVisible] = useState(false);
@@ -18,18 +19,23 @@ export default function FloatingPill({ activeAsset, favorites, onToggleFavorite 
   const handleShare = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (!activeAsset || !activeAsset.uri) return;
-    
+
     try {
       const isAvailable = await Sharing.isAvailableAsync();
       if (isAvailable) {
-        await Sharing.shareAsync(activeAsset.uri, {
-          dialogTitle: "Share from OffReel Vault",
+        let fileUri = activeAsset.uri;
+        if (!fileUri.startsWith('file://')) {
+          const assetInfo = await MediaLibrary.getAssetInfoAsync(activeAsset.id);
+          fileUri = assetInfo.localUri || assetInfo.uri;
+        }
+        await Sharing.shareAsync(fileUri, {
+          dialogTitle: 'Share from OffReel Vault',
         });
       } else {
-        Alert.alert("Sharing not available", "Your device does not support native sharing.");
+        Alert.alert('Sharing not available', 'Your device does not support native sharing.');
       }
     } catch (err) {
-      Alert.alert("Share Error", err.message);
+      Alert.alert('Share Error', err.message);
     }
   };
 
@@ -44,15 +50,20 @@ export default function FloatingPill({ activeAsset, favorites, onToggleFavorite 
       <View style={styles.pillContainer}>
         <View style={styles.pill}>
           <TouchableOpacity style={styles.iconButton} onPress={handleFavorite} activeOpacity={0.6}>
-            <Ionicons 
-              name={isFavorited ? "heart" : "heart-outline"} 
-              size={26} 
-              color={isFavorited ? "#ff2a5f" : "#fff"} 
+            <Ionicons
+              name={isFavorited ? 'heart' : 'heart-outline'}
+              size={26}
+              color={isFavorited ? '#ff2a5f' : '#fff'}
             />
           </TouchableOpacity>
-          
+
           <TouchableOpacity style={styles.iconButton} onPress={handleShare} activeOpacity={0.6}>
-            <Ionicons name="paper-plane-outline" size={24} color="#fff" style={{ marginLeft: -2 }} />
+            <Ionicons
+              name="paper-plane-outline"
+              size={24}
+              color="#fff"
+              style={{ marginLeft: -2 }}
+            />
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.iconButton} onPress={handleOptions} activeOpacity={0.6}>
@@ -64,14 +75,10 @@ export default function FloatingPill({ activeAsset, favorites, onToggleFavorite 
       {/* Custom Video Details Modal */}
       <Modal
         animationType="fade"
-        transparent={true}
+        transparent
         visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <Pressable 
-          style={styles.modalOverlay} 
-          onPress={() => setModalVisible(false)}
-        >
+        onRequestClose={() => setModalVisible(false)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setModalVisible(false)}>
           <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Vault Details</Text>
@@ -81,7 +88,12 @@ export default function FloatingPill({ activeAsset, favorites, onToggleFavorite 
             </View>
 
             <View style={styles.metadataRow}>
-              <Ionicons name="document-text-outline" size={20} color="#888" style={styles.metaIcon} />
+              <Ionicons
+                name="document-text-outline"
+                size={20}
+                color="#888"
+                style={styles.metaIcon}
+              />
               <View style={styles.metaTextContainer}>
                 <Text style={styles.metaLabel}>Filename</Text>
                 <Text style={styles.metaValue} numberOfLines={2}>
@@ -91,7 +103,12 @@ export default function FloatingPill({ activeAsset, favorites, onToggleFavorite 
             </View>
 
             <View style={styles.metadataRow}>
-              <Ionicons name="shield-checkmark-outline" size={20} color="#888" style={styles.metaIcon} />
+              <Ionicons
+                name="shield-checkmark-outline"
+                size={20}
+                color="#888"
+                style={styles.metaIcon}
+              />
               <View style={styles.metaTextContainer}>
                 <Text style={styles.metaLabel}>Status</Text>
                 <Text style={[styles.metaValue, { color: '#4caf50' }]}>Safely stored offline</Text>
@@ -129,7 +146,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  
+
   // Custom Modal Styles
   modalOverlay: {
     flex: 1,
@@ -195,5 +212,5 @@ const styles = StyleSheet.create({
     color: '#ddd',
     fontSize: 16,
     lineHeight: 22,
-  }
+  },
 });

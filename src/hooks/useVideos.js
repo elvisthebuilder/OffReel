@@ -1,8 +1,7 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as MediaLibrary from 'expo-media-library';
 import { useState, useEffect } from 'react';
 import { AppState } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
-import * as MediaLibrary from 'expo-media-library';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const VAULT_STORAGE_KEY = '@offreel_vault_videos';
 const APP_MODE_KEY = '@offreel_app_mode';
@@ -14,7 +13,7 @@ export const useVideos = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [appMode, setAppMode] = useState(null);
-  const [defaultFit, setDefaultFit] = useState("cover");
+  const [defaultFit, setDefaultFit] = useState('cover');
   const [initialVideoId, setInitialVideoId] = useState(null);
 
   useEffect(() => {
@@ -22,7 +21,7 @@ export const useVideos = () => {
       try {
         const savedMode = await AsyncStorage.getItem(APP_MODE_KEY);
         setAppMode(savedMode);
-        
+
         const savedFit = await AsyncStorage.getItem(DEFAULT_FIT_KEY);
         if (savedFit) {
           setDefaultFit(savedFit);
@@ -30,7 +29,7 @@ export const useVideos = () => {
 
         const lastId = await AsyncStorage.getItem(LAST_VIDEO_ID_KEY);
         setInitialVideoId(lastId);
-        
+
         if (savedMode === 'auto') {
           // INSTANT RESUME: Load the cached gallery map first to get the UI ready immediately
           const cachedVault = await AsyncStorage.getItem(VAULT_STORAGE_KEY);
@@ -38,7 +37,7 @@ export const useVideos = () => {
             setVideos(JSON.parse(cachedVault));
             setLoading(false);
             // Non-blocking background sync to catch new device videos
-            silentAutoScanGallery(false); 
+            silentAutoScanGallery(false);
           } else {
             // First time ever: full scan required
             await silentAutoScanGallery(true);
@@ -54,7 +53,8 @@ export const useVideos = () => {
       }
     };
     bootApp();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // silentAutoScanGallery & loadManualVault are stable inner functions
 
   useEffect(() => {
     const handleAppStateChange = (nextAppState) => {
@@ -72,24 +72,25 @@ export const useVideos = () => {
     return () => {
       subscription.remove();
     };
-  }, [appMode]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appMode]); // silentAutoScanGallery & loadManualVault are stable inner functions
 
   const loadManualVault = async () => {
     try {
       const storedVideos = await AsyncStorage.getItem(VAULT_STORAGE_KEY);
       if (storedVideos) {
         const parsed = JSON.parse(storedVideos);
-        
+
         // Fetch physically present gallery assets to filter out manually selected videos that have been deleted
         let freshIds = new Set();
         try {
           const freshAssets = await fetchAllGalleryVideos();
-          freshIds = new Set(freshAssets.map(v => v.id));
+          freshIds = new Set(freshAssets.map((v) => v.id));
         } catch (e) {
-          console.warn("Could not fetch gallery assets for validation:", e);
+          console.warn('Could not fetch gallery assets for validation:', e);
         }
 
-        const verifiedVideos = parsed.filter(video => {
+        const verifiedVideos = parsed.filter((video) => {
           // If it's a native asset (i.e. not a custom video- uri), verify it still exists physically
           if (video.id && !video.id.startsWith('video-')) {
             return freshIds.has(video.id);
@@ -132,20 +133,20 @@ export const useVideos = () => {
   const fetchAllGalleryVideos = async () => {
     // Stage 1: Get current permission state without triggering a prompt
     let { status, canAskAgain } = await MediaLibrary.getPermissionsAsync();
-    
+
     // Stage 2: Only prompt if we lack access but are permitted to ask
     if (status !== 'granted' && canAskAgain) {
       try {
         const request = await MediaLibrary.requestPermissionsAsync();
         status = request.status;
       } catch (err) {
-        console.warn("Native permission request failed:", err);
+        console.warn('Native permission request failed:', err);
       }
     }
-    
+
     // Stage 3: Final validation before accessing the bridge
     if (status !== 'granted') {
-      throw new Error("OffReel needs gallery access to populate your Vault.");
+      throw new Error('OffReel needs gallery access to populate your Vault.');
     }
 
     let allAssets = [];
@@ -154,12 +155,12 @@ export const useVideos = () => {
 
     while (hasNextPage) {
       const result = await MediaLibrary.getAssetsAsync({
-        mediaType: 'video',
+        mediaType: MediaLibrary.MediaType.video,
         first: 500, // Balanced size for bridge efficiency and fast scans
         after: endCursor,
-        sortBy: ['creationTime'],
+        sortBy: [[MediaLibrary.SortBy.creationTime, false]],
       });
-      
+
       allAssets = [...allAssets, ...result.assets];
       hasNextPage = result.hasNextPage;
       endCursor = result.endCursor;
@@ -176,33 +177,33 @@ export const useVideos = () => {
     try {
       if (shouldSetLoading) setLoading(true);
       const freshVideos = await fetchAllGalleryVideos();
-      
+
       // If gallery is empty on device, clear videos and save
       if (freshVideos.length === 0) {
         setVideos([]);
         await AsyncStorage.setItem(VAULT_STORAGE_KEY, JSON.stringify([]));
         return;
       }
-      
-      const freshIds = new Set(freshVideos.map(v => v.id));
-      
-      setVideos(prev => {
+
+      const freshIds = new Set(freshVideos.map((v) => v.id));
+
+      setVideos((prev) => {
         // Filter out cached videos that no longer exist in the physical gallery
-        const filteredPrev = prev.filter(v => freshIds.has(v.id));
-        
-        const existingIds = new Set(filteredPrev.map(v => v.id));
-        const newOnes = freshVideos.filter(v => !existingIds.has(v.id));
-        
+        const filteredPrev = prev.filter((v) => freshIds.has(v.id));
+
+        const existingIds = new Set(filteredPrev.map((v) => v.id));
+        const newOnes = freshVideos.filter((v) => !existingIds.has(v.id));
+
         // If nothing was added AND nothing was deleted, preserve reference
         if (newOnes.length === 0 && filteredPrev.length === prev.length) {
           return prev;
         }
-        
+
         const merged = [...filteredPrev, ...newOnes];
-        
+
         // Persist the synced result
         AsyncStorage.setItem(VAULT_STORAGE_KEY, JSON.stringify(merged)).catch(console.error);
-        
+
         return merged;
       });
     } catch (err) {
@@ -231,18 +232,18 @@ export const useVideos = () => {
           const request = await MediaLibrary.requestPermissionsAsync();
           status = request.status;
         } catch (err) {
-          console.warn("Native permission request failed:", err);
+          console.warn('Native permission request failed:', err);
         }
       }
       if (status !== 'granted') {
-        throw new Error("OffReel needs gallery access.");
+        throw new Error('OffReel needs gallery access.');
       }
 
       const result = await MediaLibrary.getAssetsAsync({
-        mediaType: 'video',
-        first: first,
-        after: after,
-        sortBy: ['creationTime'],
+        mediaType: MediaLibrary.MediaType.video,
+        first,
+        after,
+        sortBy: [[MediaLibrary.SortBy.creationTime, false]],
       });
 
       const formatted = result.assets.map((asset, index) => ({
@@ -257,15 +258,15 @@ export const useVideos = () => {
         endCursor: result.endCursor,
       };
     } catch (err) {
-      console.error("Failed to load paginated gallery pool:", err);
+      console.error('Failed to load paginated gallery pool:', err);
       return { assets: [], hasNextPage: false, endCursor: undefined };
     }
   };
 
   const addManualVideos = async (newAssets) => {
-    setVideos(prev => {
-      const existingIds = new Set(prev.map(v => v.id));
-      const newUnique = newAssets.filter(v => !existingIds.has(v.id));
+    setVideos((prev) => {
+      const existingIds = new Set(prev.map((v) => v.id));
+      const newUnique = newAssets.filter((v) => !existingIds.has(v.id));
       return [...prev, ...newUnique];
     });
     if (appMode !== 'manual') {
@@ -278,17 +279,17 @@ export const useVideos = () => {
     setDefaultFit(fitString);
   };
 
-  return { 
-    videos, 
-    loading, 
-    error, 
-    appMode, 
-    defaultFit, 
+  return {
+    videos,
+    loading,
+    error,
+    appMode,
+    defaultFit,
     initialVideoId,
-    changeDefaultFit, 
-    getManualSelectionPool, 
-    addManualVideos, 
-    autoScanGallery, 
-    resetVault 
+    changeDefaultFit,
+    getManualSelectionPool,
+    addManualVideos,
+    autoScanGallery,
+    resetVault,
   };
 };

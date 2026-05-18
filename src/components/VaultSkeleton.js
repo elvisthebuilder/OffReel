@@ -1,12 +1,12 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, Animated, Dimensions } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
 /**
  * OffReel Premium Skeleton Loader
- * Uses a smooth shimmer animation to bridge the gap between 
+ * Uses a smooth shimmer animation to bridge the gap between
  * UI mount and Hardware Decoder readiness.
  */
 export default function VaultSkeleton() {
@@ -32,11 +32,17 @@ export default function VaultSkeleton() {
     <View style={styles.container}>
       {/* Dark Base Layer */}
       <View style={styles.base} />
-      
+
       {/* Moving Shimmer Layer */}
       <Animated.View style={[styles.shimmerContainer, { transform: [{ translateX }] }]}>
         <LinearGradient
-          colors={['transparent', 'rgba(255,255,255,0.03)', 'rgba(255,255,255,0.08)', 'rgba(255,255,255,0.03)', 'transparent']}
+          colors={[
+            'transparent',
+            'rgba(255,255,255,0.03)',
+            'rgba(255,255,255,0.08)',
+            'rgba(255,255,255,0.03)',
+            'transparent',
+          ]}
           start={{ x: 0, y: 0.5 }}
           end={{ x: 1, y: 0.5 }}
           style={styles.gradient}
@@ -80,5 +86,5 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.02)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.05)',
-  }
+  },
 });

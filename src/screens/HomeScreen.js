@@ -1,26 +1,37 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Text, ActivityIndicator, TouchableOpacity, Modal, FlatList, Image, Linking, ToastAndroid } from 'react-native';
-import { useVideos } from '../hooks/useVideos';
-import VideoFeed from '../components/VideoFeed';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
+import React, { useState, useEffect } from 'react';
+import {
+  StyleSheet,
+  View,
+  Text,
+  ActivityIndicator,
+  TouchableOpacity,
+  Modal,
+  FlatList,
+  Image,
+  Linking,
+  ToastAndroid,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
 import VaultSkeleton from '../components/VaultSkeleton';
-import { useEffect } from 'react';
+import VideoFeed from '../components/VideoFeed';
+import { useVideos } from '../hooks/useVideos';
 
 export default function HomeScreen() {
-  const { 
-    videos, 
-    loading, 
-    error, 
-    appMode, 
-    defaultFit, 
+  const {
+    videos,
+    loading,
+    error,
+    appMode,
+    defaultFit,
     initialVideoId,
-    changeDefaultFit, 
-    getManualSelectionPool, 
-    addManualVideos, 
-    autoScanGallery, 
-    resetVault 
+    changeDefaultFit,
+    getManualSelectionPool,
+    addManualVideos,
+    autoScanGallery,
+    resetVault,
   } = useVideos();
 
   const [isSettingsVisible, setIsSettingsVisible] = useState(false);
@@ -43,7 +54,7 @@ export default function HomeScreen() {
         'Mapping Chronological Vault...',
         'Calibrating Hardware Decoders...',
         'Securing Private Assets...',
-        'Applying Zero-Copy Logic...'
+        'Applying Zero-Copy Logic...',
       ];
       let i = 0;
       const interval = setInterval(() => {
@@ -64,22 +75,22 @@ export default function HomeScreen() {
     setIsSettingsVisible(false);
     setIsPickerVisible(true);
     setIsFetchingPool(true);
-    
+
     const result = await getManualSelectionPool(120, undefined); // Fetch a slightly larger initial screen batch (4 rows of 3 grid items = 12, so 120 is great)
     setGalleryPool(result.assets);
     setHasNextPage(result.hasNextPage);
     setEndCursor(result.endCursor);
-    
+
     setSelectedVideos(new Set());
     setIsFetchingPool(false);
   };
 
   const loadNextPage = async () => {
     if (!hasNextPage || isFetchingNextPage) return;
-    
+
     setIsFetchingNextPage(true);
     const result = await getManualSelectionPool(120, endCursor);
-    setGalleryPool(prev => [...prev, ...result.assets]);
+    setGalleryPool((prev) => [...prev, ...result.assets]);
     setHasNextPage(result.hasNextPage);
     setEndCursor(result.endCursor);
     setIsFetchingNextPage(false);
@@ -91,7 +102,7 @@ export default function HomeScreen() {
   };
 
   const toggleVideoSelection = (id) => {
-    setSelectedVideos(prev => {
+    setSelectedVideos((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -100,7 +111,7 @@ export default function HomeScreen() {
   };
 
   const finalizeManualSelection = async () => {
-    const chosen = galleryPool.filter(v => selectedVideos.has(v.id));
+    const chosen = galleryPool.filter((v) => selectedVideos.has(v.id));
     if (chosen.length > 0) {
       await addManualVideos(chosen);
     }
@@ -112,9 +123,13 @@ export default function HomeScreen() {
       <View style={[styles.centered, { backgroundColor: '#000' }]}>
         <VaultSkeleton />
         <View style={styles.syncOverlay}>
-           <Text style={[styles.text, { fontSize: 11, letterSpacing: 3, opacity: 0.5, fontWeight: '800' }]}>
-             {syncStatus.toUpperCase()}
-           </Text>
+          <Text
+            style={[
+              styles.text,
+              { fontSize: 11, letterSpacing: 3, opacity: 0.5, fontWeight: '800' },
+            ]}>
+            {syncStatus.toUpperCase()}
+          </Text>
         </View>
       </View>
     );
@@ -125,7 +140,7 @@ export default function HomeScreen() {
       <View style={styles.centered}>
         <Text style={styles.text}>System Notice</Text>
         <Text style={styles.subtext}>{error}</Text>
-        <TouchableOpacity style={[styles.buttonMain, {marginTop: 10}]} onPress={handleManualPath}>
+        <TouchableOpacity style={[styles.buttonMain, { marginTop: 10 }]} onPress={handleManualPath}>
           <Text style={styles.buttonMainText}>Select Manually</Text>
         </TouchableOpacity>
       </View>
@@ -133,16 +148,18 @@ export default function HomeScreen() {
   }
 
   // Raw routing page safely awaiting routing protocol instructions natively
-  if (appMode === null || (appMode === 'manual' && videos.length === 0)) {
+  if (appMode === null || videos.length === 0) {
     return (
       <View style={styles.centered}>
         <Text style={styles.text}>Your Vault is Empty</Text>
-        <Text style={styles.subtext}>Choose how you want to natively sync your local gallery to OffReel.</Text>
-        
+        <Text style={styles.subtext}>
+          Choose how you want to natively sync your local gallery to OffReel.
+        </Text>
+
         <TouchableOpacity style={styles.buttonMain} onPress={autoScanGallery}>
           <Text style={styles.buttonMainText}>Live Auto-Sync OS Gallery</Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity style={styles.buttonOutline} onPress={handleManualPath}>
           <Text style={styles.buttonOutlineText}>Custom Select Manually</Text>
         </TouchableOpacity>
@@ -166,43 +183,47 @@ export default function HomeScreen() {
               <Text style={styles.pickerDone}>Add ({selectedVideos.size})</Text>
             </TouchableOpacity>
           </View>
-          
+
           {isFetchingPool ? (
-            <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
               <ActivityIndicator size="large" color="#fff" />
-              <Text style={{color: '#888', marginTop: 15, fontSize: 13, letterSpacing: 1}}>SCANNING LOCAL MEDIA</Text>
+              <Text style={{ color: '#888', marginTop: 15, fontSize: 13, letterSpacing: 1 }}>
+                SCANNING LOCAL MEDIA
+              </Text>
             </View>
           ) : (
             <FlatList
               data={galleryPool}
-              keyExtractor={item => item.id}
+              keyExtractor={(item) => item.id}
               numColumns={3}
               onEndReached={loadNextPage}
               onEndReachedThreshold={0.5}
-              ListFooterComponent={() => (
+              ListFooterComponent={() =>
                 isFetchingNextPage ? (
                   <View style={{ paddingVertical: 20 }}>
                     <ActivityIndicator size="small" color="#fff" />
                   </View>
                 ) : null
-              )}
+              }
               renderItem={({ item }) => {
-                const isAlreadyInVault = videos.some(v => v.id === item.id);
+                const isAlreadyInVault = videos.some((v) => v.id === item.id);
                 const isSelected = selectedVideos.has(item.id);
-                
+
                 return (
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={[styles.pickerItem, isAlreadyInVault && { opacity: 0.3 }]}
                     onPress={() => {
                       if (isAlreadyInVault) {
-                        ToastAndroid.show("This video is already in your Vault", ToastAndroid.SHORT);
+                        ToastAndroid.show(
+                          'This video is already in your Vault',
+                          ToastAndroid.SHORT
+                        );
                       } else {
                         toggleVideoSelection(item.id);
                       }
-                    }}
-                  >
+                    }}>
                     <Image source={{ uri: item.uri }} style={styles.pickerImage} />
-                    
+
                     {isAlreadyInVault ? (
                       <View style={styles.selectionOverlay}>
                         <Ionicons name="lock-closed" size={24} color="rgba(255,255,255,0.7)" />
@@ -226,16 +247,12 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       {/* Passing global settings layout efficiently beneath to structure raw render configs */}
-      <VideoFeed 
-        videos={videos} 
-        defaultFit={defaultFit} 
-        initialVideoId={initialVideoId}
-      />
-      
+      <VideoFeed videos={videos} defaultFit={defaultFit} initialVideoId={initialVideoId} />
+
       <SafeAreaView style={styles.header} edges={['top']} pointerEvents="none">
         <Text style={styles.headerText}>OffReel</Text>
       </SafeAreaView>
-      
+
       <SafeAreaView style={styles.addMoreContainer} edges={['top']}>
         {/* Only enable + appending organically firmly within Custom Manual Modes */}
         {appMode === 'manual' && (
@@ -243,9 +260,11 @@ export default function HomeScreen() {
             <Ionicons name="add" size={24} color="#fff" />
           </TouchableOpacity>
         )}
-        
+
         {/* Securely triggering transparent structural overlays instead of wiping active array */}
-        <TouchableOpacity style={[styles.addMoreButton, { marginTop: appMode === 'manual' ? 15 : 0 }]} onPress={() => setIsSettingsVisible(true)}>
+        <TouchableOpacity
+          style={[styles.addMoreButton, { marginTop: appMode === 'manual' ? 15 : 0 }]}
+          onPress={() => setIsSettingsVisible(true)}>
           <Ionicons name="settings-outline" size={20} color="rgba(255,255,255,0.7)" />
         </TouchableOpacity>
       </SafeAreaView>
@@ -254,119 +273,193 @@ export default function HomeScreen() {
       {renderPickerModal()}
 
       {/* Settings Modal Framework Overlaid securely on active Z-Axis exclusively */}
-      <Modal visible={isSettingsVisible} transparent={true} animationType="slide">
-        <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setIsSettingsVisible(false)}>
+      <Modal visible={isSettingsVisible} transparent animationType="slide">
+        <TouchableOpacity
+          style={styles.modalBackdrop}
+          activeOpacity={1}
+          onPress={() => setIsSettingsVisible(false)}>
           <TouchableOpacity activeOpacity={1} style={{ width: '100%' }} onPress={() => {}}>
             <BlurView intensity={65} tint="dark" style={styles.modalContent}>
-            
-            <View style={styles.dragHandle} />
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Vault Settings</Text>
-              <TouchableOpacity style={styles.closeButton} onPress={() => setIsSettingsVisible(false)}>
-                <Ionicons name="close" size={20} color="#888" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.modalSection}>
-              <Text style={styles.sectionLabel}>DISPLAY RATIO</Text>
-              <View style={styles.toggleContainer}>
-                <TouchableOpacity 
-                  style={[styles.toggleButton, defaultFit === 'cover' && styles.toggleButtonActive]} 
-                  onPress={() => changeDefaultFit('cover')}
-                >
-                  <Ionicons name="expand" size={16} color={defaultFit === 'cover' ? '#000' : '#888'} />
-                  <Text style={[styles.toggleLabel, defaultFit === 'cover' && styles.toggleLabelActive]}>Fill Frame</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.toggleButton, defaultFit === 'contain' && styles.toggleButtonActive]} 
-                  onPress={() => changeDefaultFit('contain')}
-                >
-                  <Ionicons name="contract" size={16} color={defaultFit === 'contain' ? '#000' : '#888'} />
-                  <Text style={[styles.toggleLabel, defaultFit === 'contain' && styles.toggleLabelActive]}>Original View</Text>
+              <View style={styles.dragHandle} />
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Vault Settings</Text>
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={() => setIsSettingsVisible(false)}>
+                  <Ionicons name="close" size={20} color="#888" />
                 </TouchableOpacity>
               </View>
-            </View>
 
-            <View style={styles.modalSection}>
-              <Text style={styles.sectionLabel}>SYNC ENGINE</Text>
-              
-              <TouchableOpacity style={[styles.actionRow, appMode === 'auto' && styles.actionRowActive]} onPress={handleAutoScan}>
-                <View style={styles.actionRowLeft}>
-                  <View style={[styles.iconCircle, appMode === 'auto' ? {backgroundColor: '#000'} : {backgroundColor: '#262626'}]}>
-                     <Ionicons name="sync" size={16} color={appMode === 'auto' ? '#fff' : '#aaa'} />
-                  </View>
-                  <View>
-                    <Text style={[styles.actionTitle, appMode === 'auto' && {color: '#000'}]}>Live OS Gallery</Text>
-                    <Text style={[styles.actionSub, appMode === 'auto' && {color: '#444'}]}>Auto-syncs device changes</Text>
-                  </View>
+              <View style={styles.modalSection}>
+                <Text style={styles.sectionLabel}>DISPLAY RATIO</Text>
+                <View style={styles.toggleContainer}>
+                  <TouchableOpacity
+                    style={[
+                      styles.toggleButton,
+                      defaultFit === 'cover' && styles.toggleButtonActive,
+                    ]}
+                    onPress={() => changeDefaultFit('cover')}>
+                    <Ionicons
+                      name="expand"
+                      size={16}
+                      color={defaultFit === 'cover' ? '#000' : '#888'}
+                    />
+                    <Text
+                      style={[
+                        styles.toggleLabel,
+                        defaultFit === 'cover' && styles.toggleLabelActive,
+                      ]}>
+                      Fill Frame
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.toggleButton,
+                      defaultFit === 'contain' && styles.toggleButtonActive,
+                    ]}
+                    onPress={() => changeDefaultFit('contain')}>
+                    <Ionicons
+                      name="contract"
+                      size={16}
+                      color={defaultFit === 'contain' ? '#000' : '#888'}
+                    />
+                    <Text
+                      style={[
+                        styles.toggleLabel,
+                        defaultFit === 'contain' && styles.toggleLabelActive,
+                      ]}>
+                      Original View
+                    </Text>
+                  </TouchableOpacity>
                 </View>
-                {appMode === 'auto' && <Ionicons name="checkmark-circle" size={24} color="#000" />}
-              </TouchableOpacity>
+              </View>
 
-              <TouchableOpacity style={[styles.actionRow, appMode === 'manual' && styles.actionRowActive, {marginTop: 10}]} onPress={handleManualPath}>
-                <View style={styles.actionRowLeft}>
-                  <View style={[styles.iconCircle, appMode === 'manual' ? {backgroundColor: '#000'} : {backgroundColor: '#262626'}]}>
-                     <Ionicons name="folder-open" size={16} color={appMode === 'manual' ? '#fff' : '#aaa'} />
-                  </View>
-                  <View>
-                    <Text style={[styles.actionTitle, appMode === 'manual' && {color: '#000'}]}>Custom Vault</Text>
-                    <Text style={[styles.actionSub, appMode === 'manual' && {color: '#444'}]}>Select videos manually</Text>
-                  </View>
-                </View>
-                {appMode === 'manual' && <Ionicons name="checkmark-circle" size={24} color="#000" />}
-              </TouchableOpacity>
+              <View style={styles.modalSection}>
+                <Text style={styles.sectionLabel}>SYNC ENGINE</Text>
 
-              <TouchableOpacity 
-                style={[styles.actionRow, {marginTop: 10, borderColor: 'rgba(255,255,255,0.05)', backgroundColor: 'rgba(255,255,255,0.02)'}]} 
-                onPress={() => {
-                  setIsSettingsVisible(false);
-                  autoScanGallery(); // Forces a re-bind of all native URIs
-                }}
-              >
-                <View style={styles.actionRowLeft}>
-                  <View style={[styles.iconCircle, {backgroundColor: '#333'}]}>
-                     <Ionicons name="refresh" size={16} color="#fff" />
+                <TouchableOpacity
+                  style={[styles.actionRow, appMode === 'auto' && styles.actionRowActive]}
+                  onPress={handleAutoScan}>
+                  <View style={styles.actionRowLeft}>
+                    <View
+                      style={[
+                        styles.iconCircle,
+                        appMode === 'auto'
+                          ? { backgroundColor: '#000' }
+                          : { backgroundColor: '#262626' },
+                      ]}>
+                      <Ionicons
+                        name="sync"
+                        size={16}
+                        color={appMode === 'auto' ? '#fff' : '#aaa'}
+                      />
+                    </View>
+                    <View>
+                      <Text style={[styles.actionTitle, appMode === 'auto' && { color: '#000' }]}>
+                        Live OS Gallery
+                      </Text>
+                      <Text style={[styles.actionSub, appMode === 'auto' && { color: '#444' }]}>
+                        Auto-syncs device changes
+                      </Text>
+                    </View>
                   </View>
-                  <View>
-                    <Text style={styles.actionTitle}>Refresh Media Bridge</Text>
-                    <Text style={styles.actionSub}>Fixes "Blank Screen" if decoder hangs</Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            </View>
+                  {appMode === 'auto' && (
+                    <Ionicons name="checkmark-circle" size={24} color="#000" />
+                  )}
+                </TouchableOpacity>
 
-            <View style={styles.modalSection}>
-              <Text style={styles.sectionLabel}>COMMUNITY</Text>
-              <TouchableOpacity 
-                style={[styles.actionRow, { borderStyle: 'dashed', borderColor: 'rgba(88, 101, 242, 0.5)' }]} 
-                onPress={() => Linking.openURL('https://discord.gg/5QYH4xaS')}
-              >
-                <View style={styles.actionRowLeft}>
-                  <View style={[styles.iconCircle, {backgroundColor: '#5865F2'}]}>
-                     <Ionicons name="logo-discord" size={16} color="#fff" />
+                <TouchableOpacity
+                  style={[
+                    styles.actionRow,
+                    appMode === 'manual' && styles.actionRowActive,
+                    { marginTop: 10 },
+                  ]}
+                  onPress={handleManualPath}>
+                  <View style={styles.actionRowLeft}>
+                    <View
+                      style={[
+                        styles.iconCircle,
+                        appMode === 'manual'
+                          ? { backgroundColor: '#000' }
+                          : { backgroundColor: '#262626' },
+                      ]}>
+                      <Ionicons
+                        name="folder-open"
+                        size={16}
+                        color={appMode === 'manual' ? '#fff' : '#aaa'}
+                      />
+                    </View>
+                    <View>
+                      <Text style={[styles.actionTitle, appMode === 'manual' && { color: '#000' }]}>
+                        Custom Vault
+                      </Text>
+                      <Text style={[styles.actionSub, appMode === 'manual' && { color: '#444' }]}>
+                        Select videos manually
+                      </Text>
+                    </View>
                   </View>
-                  <View>
-                    <Text style={styles.actionTitle}>Join The Vault</Text>
-                    <Text style={styles.actionSub}>Official Discord Community</Text>
-                  </View>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color="#5865F2" />
-              </TouchableOpacity>
-            </View>
+                  {appMode === 'manual' && (
+                    <Ionicons name="checkmark-circle" size={24} color="#000" />
+                  )}
+                </TouchableOpacity>
 
-            <View style={styles.modalSection}>
-              <Text style={styles.sectionLabel}>DANGER ZONE</Text>
-              <TouchableOpacity style={styles.resetButton} onPress={handleReset}>
-                <Ionicons name="trash-outline" size={16} color="#ff3b30" />
-                <Text style={styles.resetButtonText}>Reset & Wipe Global Vault</Text>
-              </TouchableOpacity>
-            </View>
-            
+                <TouchableOpacity
+                  style={[
+                    styles.actionRow,
+                    {
+                      marginTop: 10,
+                      borderColor: 'rgba(255,255,255,0.05)',
+                      backgroundColor: 'rgba(255,255,255,0.02)',
+                    },
+                  ]}
+                  onPress={() => {
+                    setIsSettingsVisible(false);
+                    autoScanGallery(); // Forces a re-bind of all native URIs
+                  }}>
+                  <View style={styles.actionRowLeft}>
+                    <View style={[styles.iconCircle, { backgroundColor: '#333' }]}>
+                      <Ionicons name="refresh" size={16} color="#fff" />
+                    </View>
+                    <View>
+                      <Text style={styles.actionTitle}>Refresh Media Bridge</Text>
+                      <Text style={styles.actionSub}>Fixes "Blank Screen" if decoder hangs</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.modalSection}>
+                <Text style={styles.sectionLabel}>COMMUNITY</Text>
+                <TouchableOpacity
+                  style={[
+                    styles.actionRow,
+                    { borderStyle: 'dashed', borderColor: 'rgba(88, 101, 242, 0.5)' },
+                  ]}
+                  onPress={() => Linking.openURL('https://discord.gg/5QYH4xaS')}>
+                  <View style={styles.actionRowLeft}>
+                    <View style={[styles.iconCircle, { backgroundColor: '#5865F2' }]}>
+                      <Ionicons name="logo-discord" size={16} color="#fff" />
+                    </View>
+                    <View>
+                      <Text style={styles.actionTitle}>Join The Vault</Text>
+                      <Text style={styles.actionSub}>Official Discord Community</Text>
+                    </View>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#5865F2" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.modalSection}>
+                <Text style={styles.sectionLabel}>DANGER ZONE</Text>
+                <TouchableOpacity style={styles.resetButton} onPress={handleReset}>
+                  <Ionicons name="trash-outline" size={16} color="#ff3b30" />
+                  <Text style={styles.resetButtonText}>Reset & Wipe Global Vault</Text>
+                </TouchableOpacity>
+              </View>
             </BlurView>
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
-
     </View>
   );
 }
@@ -403,8 +496,8 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     opacity: 0.8,
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: {width: -1, height: 1},
-    textShadowRadius: 10
+    textShadowOffset: { width: -1, height: 1 },
+    textShadowRadius: 10,
   },
   addMoreContainer: {
     position: 'absolute',
@@ -412,7 +505,7 @@ const styles = StyleSheet.create({
     right: 20,
     paddingTop: 5,
     zIndex: 11,
-    alignItems: 'center'
+    alignItems: 'center',
   },
   addMoreButton: {
     backgroundColor: 'rgba(255,255,255,0.15)',
@@ -632,7 +725,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   pickerItem: {
-    flex: 1/3,
+    flex: 1 / 3,
     aspectRatio: 1,
     padding: 1,
   },
@@ -646,5 +739,5 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.4)',
     alignItems: 'center',
     justifyContent: 'center',
-  }
+  },
 });
