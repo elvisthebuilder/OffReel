@@ -30,6 +30,11 @@ export default function HomeScreen() {
   const [selectedVideos, setSelectedVideos] = useState(new Set());
   const [syncStatus, setSyncStatus] = useState('Synchronizing Vault...');
 
+  // Pagination states for native gallery selection
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [endCursor, setEndCursor] = useState(undefined);
+  const [isFetchingNextPage, setIsFetchingNextPage] = useState(false);
+
   // Status rotation for better UX perceived speed
   useEffect(() => {
     if (loading && !isPickerVisible) {
@@ -59,10 +64,25 @@ export default function HomeScreen() {
     setIsSettingsVisible(false);
     setIsPickerVisible(true);
     setIsFetchingPool(true);
-    const pool = await getManualSelectionPool();
-    setGalleryPool(pool);
+    
+    const result = await getManualSelectionPool(120, undefined); // Fetch a slightly larger initial screen batch (4 rows of 3 grid items = 12, so 120 is great)
+    setGalleryPool(result.assets);
+    setHasNextPage(result.hasNextPage);
+    setEndCursor(result.endCursor);
+    
     setSelectedVideos(new Set());
     setIsFetchingPool(false);
+  };
+
+  const loadNextPage = async () => {
+    if (!hasNextPage || isFetchingNextPage) return;
+    
+    setIsFetchingNextPage(true);
+    const result = await getManualSelectionPool(120, endCursor);
+    setGalleryPool(prev => [...prev, ...result.assets]);
+    setHasNextPage(result.hasNextPage);
+    setEndCursor(result.endCursor);
+    setIsFetchingNextPage(false);
   };
 
   const handleReset = async () => {
@@ -157,6 +177,15 @@ export default function HomeScreen() {
               data={galleryPool}
               keyExtractor={item => item.id}
               numColumns={3}
+              onEndReached={loadNextPage}
+              onEndReachedThreshold={0.5}
+              ListFooterComponent={() => (
+                isFetchingNextPage ? (
+                  <View style={{ paddingVertical: 20 }}>
+                    <ActivityIndicator size="small" color="#fff" />
+                  </View>
+                ) : null
+              )}
               renderItem={({ item }) => {
                 const isAlreadyInVault = videos.some(v => v.id === item.id);
                 const isSelected = selectedVideos.has(item.id);

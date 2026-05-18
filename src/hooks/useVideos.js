@@ -155,7 +155,7 @@ export const useVideos = () => {
     while (hasNextPage) {
       const result = await MediaLibrary.getAssetsAsync({
         mediaType: 'video',
-        first: 50, // Small batches for bridge stability
+        first: 500, // Balanced size for bridge efficiency and fast scans
         after: endCursor,
         sortBy: ['creationTime'],
       });
@@ -223,16 +223,42 @@ export const useVideos = () => {
     }
   };
 
-  const getManualSelectionPool = async () => {
+  const getManualSelectionPool = async (first = 100, after = undefined) => {
     try {
-      // Intentionally bypassed setLoading to prevent main skeleton override
-      const pool = await fetchAllGalleryVideos();
-      setLoading(false);
-      return pool;
+      let { status, canAskAgain } = await MediaLibrary.getPermissionsAsync();
+      if (status !== 'granted' && canAskAgain) {
+        try {
+          const request = await MediaLibrary.requestPermissionsAsync();
+          status = request.status;
+        } catch (err) {
+          console.warn("Native permission request failed:", err);
+        }
+      }
+      if (status !== 'granted') {
+        throw new Error("OffReel needs gallery access.");
+      }
+
+      const result = await MediaLibrary.getAssetsAsync({
+        mediaType: 'video',
+        first: first,
+        after: after,
+        sortBy: ['creationTime'],
+      });
+
+      const formatted = result.assets.map((asset, index) => ({
+        id: asset.id,
+        uri: asset.uri,
+        filename: asset.filename || `Scanned Video`,
+      }));
+
+      return {
+        assets: formatted,
+        hasNextPage: result.hasNextPage,
+        endCursor: result.endCursor,
+      };
     } catch (err) {
-      setError(err.message);
-      setLoading(false);
-      return [];
+      console.error("Failed to load paginated gallery pool:", err);
+      return { assets: [], hasNextPage: false, endCursor: undefined };
     }
   };
 
