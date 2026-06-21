@@ -84,9 +84,9 @@ Want to contribute code? Read the **[Contributing Guide](CONTRIBUTING.md)** to g
 
 If you are a developer looking to build the application from source code:
 
-1. Clone the repository and install dependencies: `npm install`.
-2. Start the local server: `npx expo start`.
-3. To trigger standalone APK builds using EAS: `npx eas build --profile preview --platform android`.
+1. Clone the repository and install dependencies: `pnpm install`.
+2. Start the local server: `pnpm start`.
+3. To trigger standalone APK builds using EAS: `pnpm exec eas build --profile preview --platform android`.
 
 ---
 
@@ -96,31 +96,31 @@ OffReel uses **ESLint** and **Prettier** to enforce consistent code style and ca
 
 #### Tools
 
-| Tool | Purpose |
-| :--- | :--- |
+| Tool                                            | Purpose                                                                                                 |
+| :---------------------------------------------- | :------------------------------------------------------------------------------------------------------ |
 | **ESLint v8** (`eslint-config-universe/native`) | Enforces React Native best practices, React Hooks rules, import ordering, and unused variable detection |
-| **Prettier** | Ensures uniform code formatting (single quotes, trailing commas, 100-char line width) |
-| **`eslint-plugin-react-hooks`** | Catches missing `useEffect` dependencies and other hook violations |
+| **Prettier**                                    | Ensures uniform code formatting (single quotes, trailing commas, 100-char line width)                   |
+| **`eslint-plugin-react-hooks`**                 | Catches missing `useEffect` dependencies and other hook violations                                      |
 
 #### Configuration Files
 
-| File | Description |
-| :--- | :--- |
-| `.eslintrc.js` | ESLint rules and preset configuration |
-| `.prettierrc` | Prettier formatting preferences |
+| File            | Description                                                         |
+| :-------------- | :------------------------------------------------------------------ |
+| `.eslintrc.js`  | ESLint rules and preset configuration                               |
+| `.prettierrc`   | Prettier formatting preferences                                     |
 | `.eslintignore` | Excludes `node_modules/`, `android/`, `ios/`, `.expo/` from linting |
 
 #### Available Scripts
 
 ```bash
 # Scan the entire codebase for lint violations
-npm run lint
+pnpm lint
 
 # Auto-format all files according to Prettier rules
-npm run format
+pnpm format
 
 # Auto-fix all lint issues that can be resolved automatically
-npx eslint . --fix
+pnpm exec eslint . --fix
 ```
 
 #### Key Rules Enforced
