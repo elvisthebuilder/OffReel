@@ -27,7 +27,10 @@ export default function HomeScreen() {
     appMode,
     defaultFit,
     initialVideoId,
+    playbackSpeed,
     changeDefaultFit,
+    changePlaybackSpeed,
+    deleteVideo,
     getManualSelectionPool,
     addManualVideos,
     autoScanGallery,
@@ -277,7 +280,13 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       {/* Passing global settings layout efficiently beneath to structure raw render configs */}
-      <VideoFeed videos={videos} defaultFit={defaultFit} initialVideoId={initialVideoId} />
+      <VideoFeed
+        videos={videos}
+        defaultFit={defaultFit}
+        initialVideoId={initialVideoId}
+        playbackSpeed={playbackSpeed}
+        onVideoDeleted={deleteVideo}
+      />
 
       <SafeAreaView style={styles.header} edges={['top']} pointerEvents="none">
         <Text style={styles.headerText}>OffReel</Text>
@@ -359,6 +368,40 @@ export default function HomeScreen() {
                         defaultFit === 'contain' && styles.toggleLabelActive,
                       ]}>
                       Original View
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={styles.modalSection}>
+                <Text style={styles.sectionLabel}>PLAYBACK SPEED</Text>
+                <View style={styles.toggleContainer}>
+                  <TouchableOpacity
+                    style={[
+                      styles.toggleButton,
+                      playbackSpeed === 1.5 && styles.toggleButtonActive,
+                    ]}
+                    onPress={() => changePlaybackSpeed(1.5)}>
+                    <Text
+                      style={[
+                        styles.toggleLabel,
+                        playbackSpeed === 1.5 && styles.toggleLabelActive,
+                      ]}>
+                      1.5x
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.toggleButton,
+                      playbackSpeed === 2.0 && styles.toggleButtonActive,
+                    ]}
+                    onPress={() => changePlaybackSpeed(2.0)}>
+                    <Text
+                      style={[
+                        styles.toggleLabel,
+                        playbackSpeed === 2.0 && styles.toggleLabelActive,
+                      ]}>
+                      2.0x
                     </Text>
                   </TouchableOpacity>
                 </View>

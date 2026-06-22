@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import * as MediaLibrary from 'expo-media-library';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
+
 import VaultSkeleton from '../components/VaultSkeleton';
 
 export default function AlbumsScreen() {
@@ -38,7 +39,7 @@ export default function AlbumsScreen() {
             const hasVideos = assets.assets && assets.assets.length > 0;
             const previewUri = hasVideos ? assets.assets[0].uri : null;
             return { ...alb, hasVideos, previewUri };
-          } catch (e) {
+          } catch (_) {
             return { ...alb, hasVideos: false, previewUri: null };
           }
         });

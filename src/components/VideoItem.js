@@ -3,16 +3,29 @@ import * as Haptics from 'expo-haptics';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEffect, useState, useRef } from 'react';
 import { StyleSheet, View, Pressable, Text, TouchableOpacity, Animated } from 'react-native';
+
 import AlbumChips from './AlbumChips';
 
-function ActiveVideoItem({ asset, isActive, defaultFit, isLiked, onDoubleTapLike, onReady, onAlbumSelect, selectedAlbumId }) {
+function ActiveVideoItem({
+  asset,
+  isActive,
+  defaultFit,
+  isLiked,
+  onDoubleTapLike,
+  onReady,
+  onAlbumSelect,
+  selectedAlbumId,
+  playbackSpeed,
+}) {
   const [contentFit, setContentFit] = useState(defaultFit);
   const [isPausedByUser, setIsPausedByUser] = useState(false);
   const [isFullscreenMode, setIsFullscreenMode] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [isFastForwarding, setIsFastForwarding] = useState(false);
   const videoOpacity = useRef(new Animated.Value(0)).current;
   const progressInterval = useRef(null);
+  const fastForwardInterval = useRef(null);
 
   const player = useVideoPlayer(asset.uri, (p) => {
     p.loop = true;
@@ -73,19 +86,39 @@ function ActiveVideoItem({ asset, isActive, defaultFit, isLiked, onDoubleTapLike
     };
   }, []);
 
-  const handlePressIn = () => {
-    longPressTimer.current = setTimeout(() => {
-      setIsFullscreenMode(true);
-      player.pause();
-      setIsPausedByUser(true);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    }, LONG_PRESS_DURATION);
+  const handlePressIn = (e) => {
+    const { locationX, width } = e.nativeEvent;
+    const isRightSide = locationX > width * 0.75;
+
+    if (isRightSide && player.playing) {
+      // Right-side press while playing — start fast-forwarding
+      setIsFastForwarding(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      fastForwardInterval.current = setInterval(() => {
+        if (player && player.currentTime !== undefined) {
+          player.currentTime = Math.min(player.currentTime + playbackSpeed * 0.5, duration);
+        }
+      }, 100);
+    } else {
+      // Left/center press — long press for fullscreen
+      longPressTimer.current = setTimeout(() => {
+        setIsFullscreenMode(true);
+        player.pause();
+        setIsPausedByUser(true);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      }, LONG_PRESS_DURATION);
+    }
   };
 
   const handlePressOut = () => {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
+    }
+    if (fastForwardInterval.current) {
+      clearInterval(fastForwardInterval.current);
+      fastForwardInterval.current = null;
+      setIsFastForwarding(false);
     }
   };
 
@@ -178,7 +211,12 @@ function ActiveVideoItem({ asset, isActive, defaultFit, isLiked, onDoubleTapLike
 
           {/* Progress bar */}
           <View style={styles.progressContainer}>
-            <View style={[styles.progressBar, { width: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%' }]} />
+            <View
+              style={[
+                styles.progressBar,
+                { width: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%' },
+              ]}
+            />
           </View>
 
           {/* Full-screen tap handler — single = pause, double = like, long press = fullscreen */}
@@ -187,6 +225,11 @@ function ActiveVideoItem({ asset, isActive, defaultFit, isLiked, onDoubleTapLike
             onPress={handleTap}
             onLongPress={handlePressIn}
             onPressOut={handlePressOut}>
+            {isFastForwarding && (
+              <View style={styles.fastForwardIndicator} pointerEvents="none">
+                <Text style={styles.fastForwardText}>{playbackSpeed}x &gt;&gt;</Text>
+              </View>
+            )}
             {isPausedByUser && isActive && (
               <View style={styles.pauseOverlay}>
                 <Text style={styles.playIcon}>▶</Text>
@@ -416,5 +459,21 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.7)',
     fontSize: 14,
     fontWeight: '500',
+  },
+  fastForwardIndicator: {
+    position: 'absolute',
+    right: 30,
+    top: '50%',
+    marginTop: -20,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    zIndex: 250,
+  },
+  fastForwardText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
   },
 });

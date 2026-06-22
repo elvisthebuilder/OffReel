@@ -7,6 +7,7 @@ const VAULT_STORAGE_KEY = '@offreel_vault_videos';
 const APP_MODE_KEY = '@offreel_app_mode';
 const DEFAULT_FIT_KEY = '@offreel_default_fit';
 const LAST_VIDEO_ID_KEY = '@offreel_last_video_id';
+const PLAYBACK_SPEED_KEY = '@offreel_playback_speed';
 
 export const useVideos = () => {
   const [videos, setVideos] = useState([]);
@@ -15,6 +16,7 @@ export const useVideos = () => {
   const [appMode, setAppMode] = useState(null);
   const [defaultFit, setDefaultFit] = useState('cover');
   const [initialVideoId, setInitialVideoId] = useState(null);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1.5);
 
   useEffect(() => {
     const bootApp = async () => {
@@ -29,6 +31,11 @@ export const useVideos = () => {
 
         const lastId = await AsyncStorage.getItem(LAST_VIDEO_ID_KEY);
         setInitialVideoId(lastId);
+
+        const savedSpeed = await AsyncStorage.getItem(PLAYBACK_SPEED_KEY);
+        if (savedSpeed) {
+          setPlaybackSpeed(parseFloat(savedSpeed));
+        }
 
         if (savedMode === 'auto') {
           // INSTANT RESUME: Load the cached gallery map first to get the UI ready immediately
@@ -132,7 +139,9 @@ export const useVideos = () => {
 
   const fetchAllGalleryVideos = async () => {
     // Ensure media permission; prefer cached/native state and only prompt when allowed
-    const perm = await require('../utils/mediaPermissions').ensureMediaPermission({ forceRequest: false });
+    const perm = await require('../utils/mediaPermissions').ensureMediaPermission({
+      forceRequest: false,
+    });
     if (perm !== 'granted') {
       throw new Error('OffReel needs gallery access to populate your Vault.');
     }
@@ -214,7 +223,9 @@ export const useVideos = () => {
 
   const getManualSelectionPool = async (first = 100, after = undefined) => {
     try {
-      const perm = await require('../utils/mediaPermissions').ensureMediaPermission({ forceRequest: false });
+      const perm = await require('../utils/mediaPermissions').ensureMediaPermission({
+        forceRequest: false,
+      });
       if (perm !== 'granted') {
         throw new Error('OffReel needs gallery access.');
       }
@@ -259,6 +270,15 @@ export const useVideos = () => {
     setDefaultFit(fitString);
   };
 
+  const changePlaybackSpeed = async (speed) => {
+    await AsyncStorage.setItem(PLAYBACK_SPEED_KEY, speed.toString());
+    setPlaybackSpeed(speed);
+  };
+
+  const deleteVideo = (videoId) => {
+    setVideos((prev) => prev.filter((v) => v.id !== videoId));
+  };
+
   return {
     videos,
     loading,
@@ -266,7 +286,10 @@ export const useVideos = () => {
     appMode,
     defaultFit,
     initialVideoId,
+    playbackSpeed,
     changeDefaultFit,
+    changePlaybackSpeed,
+    deleteVideo,
     getManualSelectionPool,
     addManualVideos,
     autoScanGallery,

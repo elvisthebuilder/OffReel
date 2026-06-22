@@ -1,8 +1,9 @@
+import * as MediaLibrary from 'expo-media-library';
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import * as MediaLibrary from 'expo-media-library';
-import { ensureMediaPermission } from '../utils/mediaPermissions';
+
 import { ChipSkeleton } from './Skeleton';
+import { ensureMediaPermission } from '../utils/mediaPermissions';
 
 export default function AlbumChips({ selectedAlbumId, onSelect }) {
   const [albums, setAlbums] = useState([]);
@@ -33,7 +34,7 @@ export default function AlbumChips({ selectedAlbumId, onSelect }) {
             });
             const hasVideos = assets.assets && assets.assets.length > 0;
             return hasVideos ? { id: alb.id, title: alb.title } : null;
-          } catch (e) {
+          } catch (_) {
             return null;
           }
         });
@@ -58,7 +59,10 @@ export default function AlbumChips({ selectedAlbumId, onSelect }) {
   if (loading)
     return (
       <View style={styles.loaderRow}>
-        <ScrollView horizontal contentContainerStyle={{ paddingHorizontal: 12 }} showsHorizontalScrollIndicator={false}>
+        <ScrollView
+          horizontal
+          contentContainerStyle={{ paddingHorizontal: 12 }}
+          showsHorizontalScrollIndicator={false}>
           <ChipSkeleton />
           <ChipSkeleton />
           <ChipSkeleton />
@@ -70,7 +74,10 @@ export default function AlbumChips({ selectedAlbumId, onSelect }) {
 
   return (
     <View style={styles.container} pointerEvents="box-none">
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.row}>
         <TouchableOpacity
           style={[styles.chip, !selectedAlbumId && styles.chipActive]}
           onPress={() => onSelect(null)}
@@ -84,7 +91,9 @@ export default function AlbumChips({ selectedAlbumId, onSelect }) {
             style={[styles.chip, selectedAlbumId === a.id && styles.chipActive]}
             onPress={() => onSelect(a.id)}
             activeOpacity={0.7}>
-            <Text style={[styles.text, selectedAlbumId === a.id && styles.textActive]}>{a.title}</Text>
+            <Text style={[styles.text, selectedAlbumId === a.id && styles.textActive]}>
+              {a.title}
+            </Text>
           </TouchableOpacity>
         ))}
       </ScrollView>

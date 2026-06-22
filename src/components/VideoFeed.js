@@ -1,16 +1,22 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as MediaLibrary from 'expo-media-library';
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { FlatList, StyleSheet, Dimensions, View } from 'react-native';
 
 import FloatingPill from './FloatingPill';
-import VideoItem from './VideoItem';
 import VaultSkeleton from './VaultSkeleton';
-import * as MediaLibrary from 'expo-media-library';
+import VideoItem from './VideoItem';
 
 const { height } = Dimensions.get('window');
 const LAST_VIDEO_ID_KEY = '@offreel_last_video_id';
 
-export default function VideoFeed({ videos, defaultFit, initialVideoId }) {
+export default function VideoFeed({
+  videos,
+  defaultFit,
+  initialVideoId,
+  playbackSpeed,
+  onVideoDeleted,
+}) {
   const flatListRef = useRef(null);
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
   const [feedHeight, setFeedHeight] = useState(height);
@@ -115,7 +121,11 @@ export default function VideoFeed({ videos, defaultFit, initialVideoId }) {
                 first: 1000,
               });
               // Map to same shape used by the vault (id, uri, filename)
-              const mapped = res.assets.map((a) => ({ id: a.id, uri: a.uri, filename: a.filename }));
+              const mapped = res.assets.map((a) => ({
+                id: a.id,
+                uri: a.uri,
+                filename: a.filename,
+              }));
               setFilteredVideos(mapped);
               // Reset position to top of filtered feed
               setActiveVideoIndex(0);
@@ -124,10 +134,20 @@ export default function VideoFeed({ videos, defaultFit, initialVideoId }) {
             }
           }}
           selectedAlbumId={selectedAlbumId}
+          playbackSpeed={playbackSpeed}
         />
       );
     },
-    [activeVideoIndex, feedHeight, defaultFit, favorites, toggleFavorite, videos]
+    [
+      activeVideoIndex,
+      feedHeight,
+      defaultFit,
+      favorites,
+      toggleFavorite,
+      videos,
+      playbackSpeed,
+      selectedAlbumId,
+    ]
   );
 
   const onFeedLayout = useCallback((e) => {
@@ -177,10 +197,10 @@ export default function VideoFeed({ videos, defaultFit, initialVideoId }) {
         favorites={favorites}
         onToggleFavorite={toggleFavorite}
         onDeleteVideo={(videoId) => {
-          setVideos((prev) => prev.filter((v) => v.id !== videoId));
           if (selectedAlbumId) {
             setFilteredVideos((prev) => prev.filter((v) => v.id !== videoId));
           }
+          onVideoDeleted?.(videoId);
         }}
       />
     </View>

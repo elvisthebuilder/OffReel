@@ -39,7 +39,9 @@ export default function VaultSkeleton() {
       {/* Pulsing skeleton blocks */}
       <View style={styles.content}>
         <Animated.View style={[styles.skelBlock, { opacity }]} />
-        <Animated.View style={[styles.skelBlock, styles.skelBlockMed, { opacity, marginTop: 20 }]} />
+        <Animated.View
+          style={[styles.skelBlock, styles.skelBlockMed, { opacity, marginTop: 20 }]}
+        />
         <Animated.View style={[styles.skelBlock, { opacity, marginTop: 20 }]} />
       </View>
     </View>
