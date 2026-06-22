@@ -176,6 +176,12 @@ export default function VideoFeed({ videos, defaultFit, initialVideoId }) {
         activeAsset={sourceVideos[activeVideoIndex]}
         favorites={favorites}
         onToggleFavorite={toggleFavorite}
+        onDeleteVideo={(videoId) => {
+          setVideos((prev) => prev.filter((v) => v.id !== videoId));
+          if (selectedAlbumId) {
+            setFilteredVideos((prev) => prev.filter((v) => v.id !== videoId));
+          }
+        }}
       />
     </View>
   );

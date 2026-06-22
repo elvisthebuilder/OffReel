@@ -8,7 +8,11 @@ import AlbumChips from './AlbumChips';
 function ActiveVideoItem({ asset, isActive, defaultFit, isLiked, onDoubleTapLike, onReady, onAlbumSelect, selectedAlbumId }) {
   const [contentFit, setContentFit] = useState(defaultFit);
   const [isPausedByUser, setIsPausedByUser] = useState(false);
+  const [isFullscreenMode, setIsFullscreenMode] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
   const videoOpacity = useRef(new Animated.Value(0)).current;
+  const progressInterval = useRef(null);
 
   const player = useVideoPlayer(asset.uri, (p) => {
     p.loop = true;
@@ -32,6 +36,9 @@ function ActiveVideoItem({ asset, isActive, defaultFit, isLiked, onDoubleTapLike
         }).start();
         onReady?.();
       }
+      if (payload.status === 'readyToPlay' || payload.status === 'playing') {
+        setDuration(p.duration || 0);
+      }
     });
 
     return () => subscription.remove();
@@ -42,25 +49,45 @@ function ActiveVideoItem({ asset, isActive, defaultFit, isLiked, onDoubleTapLike
   const heartScale = useRef(new Animated.Value(0)).current;
   const heartOpacity = useRef(new Animated.Value(0)).current;
   const lastTap = useRef(null);
+  const longPressTimer = useRef(null);
   const DOUBLE_TAP_DELAY = 300;
+  const LONG_PRESS_DURATION = 500;
 
   useEffect(() => {
-    setContentFit(defaultFit);
-  }, [defaultFit]);
-
-  useEffect(() => {
-    if (isActive) {
-      if (!isPausedByUser) {
-        player.play();
-      }
-    } else {
-      player.pause();
-      player.currentTime = 0;
-      setIsPausedByUser(false);
-      videoOpacity.setValue(0); // Reset for next mount
+    if (isActive && !isPausedByUser) {
+      progressInterval.current = setInterval(() => {
+        if (player) {
+          setCurrentTime(player.currentTime || 0);
+        }
+      }, 100);
+      return () => {
+        if (progressInterval.current) clearInterval(progressInterval.current);
+      };
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive, isPausedByUser, player]); // videoOpacity is a stable Animated ref
+  }, [isActive, isPausedByUser, player]);
+
+  useEffect(() => {
+    return () => {
+      if (longPressTimer.current) clearTimeout(longPressTimer.current);
+      if (progressInterval.current) clearInterval(progressInterval.current);
+    };
+  }, []);
+
+  const handlePressIn = () => {
+    longPressTimer.current = setTimeout(() => {
+      setIsFullscreenMode(true);
+      player.pause();
+      setIsPausedByUser(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }, LONG_PRESS_DURATION);
+  };
+
+  const handlePressOut = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
 
   const burstHeart = (x, y) => {
     setHeartPos({ x, y });
@@ -119,49 +146,80 @@ function ActiveVideoItem({ asset, isActive, defaultFit, isLiked, onDoubleTapLike
 
   return (
     <View style={styles.videoContainer}>
-      <Animated.View style={[styles.video, { opacity: videoOpacity }]}>
-        <VideoView
-          style={styles.video}
-          player={player}
-          showsControls={false}
-          nativeControls={false}
-          contentFit={contentFit}
-        />
-      </Animated.View>
+      {isFullscreenMode ? (
+        // Fullscreen clean mode (Instagram Reels style)
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={() => setIsFullscreenMode(false)}
+          onLongPress={handlePressIn}
+          onPressOut={handlePressOut}>
+          <Animated.View style={[styles.video, { opacity: videoOpacity }]}>
+            <VideoView
+              style={styles.video}
+              player={player}
+              showsControls={false}
+              nativeControls={false}
+              contentFit={contentFit}
+            />
+          </Animated.View>
+          <Text style={styles.fullscreenExitHint}>Tap to exit fullscreen</Text>
+        </Pressable>
+      ) : (
+        <>
+          <Animated.View style={[styles.video, { opacity: videoOpacity }]}>
+            <VideoView
+              style={styles.video}
+              player={player}
+              showsControls={false}
+              nativeControls={false}
+              contentFit={contentFit}
+            />
+          </Animated.View>
 
-      {/* Full-screen tap handler — single = pause, double = like */}
-      <Pressable style={StyleSheet.absoluteFill} onPress={handleTap}>
-        {isPausedByUser && isActive && (
-          <View style={styles.pauseOverlay}>
-            <Text style={styles.playIcon}>▶</Text>
-            <TouchableOpacity style={styles.fitToggle} onPress={toggleFit} activeOpacity={0.7}>
-              <Ionicons
-                name={contentFit === 'cover' ? 'scan-outline' : 'expand-outline'}
-                size={18}
-                color="#fff"
-              />
-            </TouchableOpacity>
-
-            {/* Album filter chips appear at the top when paused */}
-            <AlbumChips selectedAlbumId={selectedAlbumId} onSelect={onAlbumSelect} />
+          {/* Progress bar */}
+          <View style={styles.progressContainer}>
+            <View style={[styles.progressBar, { width: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%' }]} />
           </View>
-        )}
-      </Pressable>
 
-      {/* Floating heart burst on double-tap */}
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.heartBurst,
-          {
-            left: heartPos.x - 45,
-            top: heartPos.y - 45,
-            opacity: heartOpacity,
-            transform: [{ scale: heartScale }],
-          },
-        ]}>
-        <Ionicons name="heart" size={90} color="#ff2b54" />
-      </Animated.View>
+          {/* Full-screen tap handler — single = pause, double = like, long press = fullscreen */}
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={handleTap}
+            onLongPress={handlePressIn}
+            onPressOut={handlePressOut}>
+            {isPausedByUser && isActive && (
+              <View style={styles.pauseOverlay}>
+                <Text style={styles.playIcon}>▶</Text>
+                <TouchableOpacity style={styles.fitToggle} onPress={toggleFit} activeOpacity={0.7}>
+                  <Ionicons
+                    name={contentFit === 'cover' ? 'scan-outline' : 'expand-outline'}
+                    size={18}
+                    color="#fff"
+                  />
+                </TouchableOpacity>
+
+                {/* Album filter chips appear at the top when paused */}
+                <AlbumChips selectedAlbumId={selectedAlbumId} onSelect={onAlbumSelect} />
+              </View>
+            )}
+          </Pressable>
+
+          {/* Floating heart burst on double-tap */}
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.heartBurst,
+              {
+                left: heartPos.x - 45,
+                top: heartPos.y - 45,
+                opacity: heartOpacity,
+                transform: [{ scale: heartScale }],
+              },
+            ]}>
+            <Ionicons name="heart" size={90} color="#ff2b54" />
+          </Animated.View>
+        </>
+      )}
     </View>
   );
 }
@@ -337,5 +395,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+  },
+  progressContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    zIndex: 150,
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#ff3b30',
+  },
+  fullscreenExitHint: {
+    position: 'absolute',
+    bottom: 30,
+    alignSelf: 'center',
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });

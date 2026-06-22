@@ -151,16 +151,46 @@ export default function HomeScreen() {
   if (appMode === null || videos.length === 0) {
     return (
       <View style={styles.centered}>
+        <View style={styles.emptyStateIcon}>
+          <Ionicons name="lock-open-outline" size={64} color="rgba(255,255,255,0.2)" />
+        </View>
+
         <Text style={styles.text}>Your Vault is Empty</Text>
         <Text style={styles.subtext}>
           Choose how you want to natively sync your local gallery to OffReel.
         </Text>
 
+        {/* Visual step-by-step guide */}
+        <View style={styles.stepsContainer}>
+          <View style={styles.step}>
+            <View style={styles.stepNumber}>
+              <Text style={styles.stepNumberText}>1</Text>
+            </View>
+            <Text style={styles.stepLabel}>Grant Gallery Access</Text>
+          </View>
+
+          <View style={[styles.step, { opacity: 0.6 }]}>
+            <View style={styles.stepNumber}>
+              <Text style={styles.stepNumberText}>2</Text>
+            </View>
+            <Text style={styles.stepLabel}>Choose Sync Method</Text>
+          </View>
+
+          <View style={[styles.step, { opacity: 0.4 }]}>
+            <View style={styles.stepNumber}>
+              <Text style={styles.stepNumberText}>3</Text>
+            </View>
+            <Text style={styles.stepLabel}>Start Browsing</Text>
+          </View>
+        </View>
+
         <TouchableOpacity style={styles.buttonMain} onPress={autoScanGallery}>
+          <Ionicons name="sync" size={20} color="#000" style={{ marginRight: 8 }} />
           <Text style={styles.buttonMainText}>Live Auto-Sync OS Gallery</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.buttonOutline} onPress={handleManualPath}>
+          <Ionicons name="folder-open-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
           <Text style={styles.buttonOutlineText}>Custom Select Manually</Text>
         </TouchableOpacity>
 
@@ -534,8 +564,10 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 30,
     borderRadius: 16,
-    width: '100%',
+    width: '85%',
     alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -555,15 +587,53 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 30,
     borderRadius: 16,
-    width: '100%',
+    width: '85%',
     alignItems: 'center',
-    marginTop: 12, // Significant spacing for clarity
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 12,
   },
   buttonOutlineText: {
     color: 'rgba(255,255,255,0.8)',
     fontWeight: '700',
     fontSize: 16,
     letterSpacing: -0.2,
+  },
+  emptyStateIcon: {
+    marginBottom: 20,
+    opacity: 0.5,
+  },
+  stepsContainer: {
+    marginVertical: 30,
+    marginBottom: 40,
+    paddingHorizontal: 20,
+    width: '100%',
+  },
+  step: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 12,
+  },
+  stepNumber: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  stepNumberText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  stepLabel: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 14,
+    fontWeight: '600',
   },
   modalBackdrop: {
     flex: 1,
