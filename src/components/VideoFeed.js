@@ -4,6 +4,8 @@ import { FlatList, StyleSheet, Dimensions, View } from 'react-native';
 
 import FloatingPill from './FloatingPill';
 import VideoItem from './VideoItem';
+import VaultSkeleton from './VaultSkeleton';
+import * as MediaLibrary from 'expo-media-library';
 
 const { height } = Dimensions.get('window');
 const LAST_VIDEO_ID_KEY = '@offreel_last_video_id';
@@ -14,16 +16,21 @@ export default function VideoFeed({ videos, defaultFit, initialVideoId }) {
   const [feedHeight, setFeedHeight] = useState(height);
   const [favorites, setFavorites] = useState(new Set());
 
+  // Album filter state: null = all
+  const [selectedAlbumId, setSelectedAlbumId] = useState(null);
+  const [filteredVideos, setFilteredVideos] = useState(videos);
+
   // Track if we've stabilized at our starting position
   const [isReadyForSaving, setIsReadyForSaving] = useState(false);
 
   // PRE-CALCULATE STARTING INDEX: This is the most robust way to resume.
   // We determine the index BEFORE the FlatList mounts.
   const startingIndex = useMemo(() => {
-    if (!initialVideoId || videos.length === 0) return 0;
-    const idx = videos.findIndex((v) => v.id === initialVideoId);
+    const source = filteredVideos || videos;
+    if (!initialVideoId || source.length === 0) return 0;
+    const idx = source.findIndex((v) => v.id === initialVideoId);
     return idx >= 0 ? idx : 0;
-  }, [videos, initialVideoId]);
+  }, [filteredVideos, videos, initialVideoId]);
 
   // Synchronize the active index state with our calculated starting index on mount
   useEffect(() => {
@@ -91,10 +98,36 @@ export default function VideoFeed({ videos, defaultFit, initialVideoId }) {
           defaultFit={defaultFit}
           isLiked={favorites.has(item.id)}
           onDoubleTapLike={() => toggleFavorite(item.id)}
+          // album filtering controls (rendered when paused inside VideoItem)
+          onAlbumSelect={async (albumId) => {
+            if (!albumId) {
+              setSelectedAlbumId(null);
+              setFilteredVideos(videos);
+              return;
+            }
+
+            setSelectedAlbumId(albumId);
+
+            try {
+              const res = await MediaLibrary.getAssetsAsync({
+                album: albumId,
+                mediaType: MediaLibrary.MediaType.video,
+                first: 1000,
+              });
+              // Map to same shape used by the vault (id, uri, filename)
+              const mapped = res.assets.map((a) => ({ id: a.id, uri: a.uri, filename: a.filename }));
+              setFilteredVideos(mapped);
+              // Reset position to top of filtered feed
+              setActiveVideoIndex(0);
+            } catch (e) {
+              console.error('Failed to load assets for album filter:', e);
+            }
+          }}
+          selectedAlbumId={selectedAlbumId}
         />
       );
     },
-    [activeVideoIndex, feedHeight, defaultFit, favorites, toggleFavorite]
+    [activeVideoIndex, feedHeight, defaultFit, favorites, toggleFavorite, videos]
   );
 
   const onFeedLayout = useCallback((e) => {
@@ -104,14 +137,15 @@ export default function VideoFeed({ videos, defaultFit, initialVideoId }) {
     }
   }, []);
 
-  // Return null or skeleton if we have no videos yet
-  if (videos.length === 0) return null;
+  // Select source videos (either filtered by album or all)
+  const sourceVideos = selectedAlbumId ? filteredVideos : videos;
+  if (!sourceVideos || sourceVideos.length === 0) return <VaultSkeleton />;
 
   return (
     <View style={styles.container} onLayout={onFeedLayout}>
       <FlatList
         ref={flatListRef}
-        data={videos}
+        data={sourceVideos}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         pagingEnabled
@@ -139,7 +173,7 @@ export default function VideoFeed({ videos, defaultFit, initialVideoId }) {
       />
 
       <FloatingPill
-        activeAsset={videos[activeVideoIndex]}
+        activeAsset={sourceVideos[activeVideoIndex]}
         favorites={favorites}
         onToggleFavorite={toggleFavorite}
       />

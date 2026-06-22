@@ -3,8 +3,9 @@ import * as Haptics from 'expo-haptics';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEffect, useState, useRef } from 'react';
 import { StyleSheet, View, Pressable, Text, TouchableOpacity, Animated } from 'react-native';
+import AlbumChips from './AlbumChips';
 
-function ActiveVideoItem({ asset, isActive, defaultFit, isLiked, onDoubleTapLike, onReady }) {
+function ActiveVideoItem({ asset, isActive, defaultFit, isLiked, onDoubleTapLike, onReady, onAlbumSelect, selectedAlbumId }) {
   const [contentFit, setContentFit] = useState(defaultFit);
   const [isPausedByUser, setIsPausedByUser] = useState(false);
   const videoOpacity = useRef(new Animated.Value(0)).current;
@@ -140,6 +141,9 @@ function ActiveVideoItem({ asset, isActive, defaultFit, isLiked, onDoubleTapLike
                 color="#fff"
               />
             </TouchableOpacity>
+
+            {/* Album filter chips appear at the top when paused */}
+            <AlbumChips selectedAlbumId={selectedAlbumId} onSelect={onAlbumSelect} />
           </View>
         )}
       </Pressable>
@@ -192,6 +196,8 @@ export default function VideoItem({
   defaultFit,
   isLiked,
   onDoubleTapLike,
+  onAlbumSelect,
+  selectedAlbumId,
 }) {
   const [isPlayerReady, setIsPlayerReady] = useState(false);
   const posterOpacity = useRef(new Animated.Value(1)).current;
@@ -234,13 +240,16 @@ export default function VideoItem({
             isLiked={isLiked}
             onDoubleTapLike={onDoubleTapLike}
             onReady={() => setIsPlayerReady(true)}
+            onAlbumSelect={onAlbumSelect}
+            selectedAlbumId={selectedAlbumId}
           />
         </View>
       ) : isVisible ? (
         <VideoThumbnail asset={asset} contentFit={defaultFit} />
       ) : (
         <View style={styles.placeholder}>
-          <Ionicons name="videocam-outline" size={40} color="rgba(255,255,255,0.05)" />
+          {/* Use a card skeleton while offscreen for visual stability */}
+          <View style={styles.skelCard} />
         </View>
       )}
     </View>
@@ -278,6 +287,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#050505',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  skelCard: {
+    width: '90%',
+    height: '60%',
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.03)',
   },
   pauseOverlay: {
     ...StyleSheet.absoluteFillObject,

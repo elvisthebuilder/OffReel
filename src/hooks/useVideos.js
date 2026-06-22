@@ -131,21 +131,9 @@ export const useVideos = () => {
   };
 
   const fetchAllGalleryVideos = async () => {
-    // Stage 1: Get current permission state without triggering a prompt
-    let { status, canAskAgain } = await MediaLibrary.getPermissionsAsync();
-
-    // Stage 2: Only prompt if we lack access but are permitted to ask
-    if (status !== 'granted' && canAskAgain) {
-      try {
-        const request = await MediaLibrary.requestPermissionsAsync();
-        status = request.status;
-      } catch (err) {
-        console.warn('Native permission request failed:', err);
-      }
-    }
-
-    // Stage 3: Final validation before accessing the bridge
-    if (status !== 'granted') {
+    // Ensure media permission; prefer cached/native state and only prompt when allowed
+    const perm = await require('../utils/mediaPermissions').ensureMediaPermission({ forceRequest: false });
+    if (perm !== 'granted') {
       throw new Error('OffReel needs gallery access to populate your Vault.');
     }
 
@@ -226,16 +214,8 @@ export const useVideos = () => {
 
   const getManualSelectionPool = async (first = 100, after = undefined) => {
     try {
-      let { status, canAskAgain } = await MediaLibrary.getPermissionsAsync();
-      if (status !== 'granted' && canAskAgain) {
-        try {
-          const request = await MediaLibrary.requestPermissionsAsync();
-          status = request.status;
-        } catch (err) {
-          console.warn('Native permission request failed:', err);
-        }
-      }
-      if (status !== 'granted') {
+      const perm = await require('../utils/mediaPermissions').ensureMediaPermission({ forceRequest: false });
+      if (perm !== 'granted') {
         throw new Error('OffReel needs gallery access.');
       }
 

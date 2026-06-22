@@ -1,31 +1,34 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, Animated, Dimensions } from 'react-native';
-
-const { width } = Dimensions.get('window');
+import { View, StyleSheet, Animated } from 'react-native';
 
 /**
  * OffReel Premium Skeleton Loader
- * Uses a smooth shimmer animation to bridge the gap between
- * UI mount and Hardware Decoder readiness.
+ * Uses a gentle pulsing opacity animation for a premium feel.
  */
 export default function VaultSkeleton() {
-  const shimmerValue = useRef(new Animated.Value(-1)).current;
+  const pulseValue = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Infinite shimmering loop
+    // Infinite pulsing loop: fade in and out gently
     Animated.loop(
-      Animated.timing(shimmerValue, {
-        toValue: 1,
-        duration: 2000,
-        useNativeDriver: true,
-      })
+      Animated.sequence([
+        Animated.timing(pulseValue, {
+          toValue: 1,
+          duration: 1200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseValue, {
+          toValue: 0,
+          duration: 1200,
+          useNativeDriver: true,
+        }),
+      ])
     ).start();
-  }, [shimmerValue]);
+  }, [pulseValue]);
 
-  const translateX = shimmerValue.interpolate({
-    inputRange: [-1, 1],
-    outputRange: [-width, width],
+  const opacity = pulseValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.5, 1],
   });
 
   return (
@@ -33,25 +36,11 @@ export default function VaultSkeleton() {
       {/* Dark Base Layer */}
       <View style={styles.base} />
 
-      {/* Moving Shimmer Layer */}
-      <Animated.View style={[styles.shimmerContainer, { transform: [{ translateX }] }]}>
-        <LinearGradient
-          colors={[
-            'transparent',
-            'rgba(255,255,255,0.03)',
-            'rgba(255,255,255,0.08)',
-            'rgba(255,255,255,0.03)',
-            'transparent',
-          ]}
-          start={{ x: 0, y: 0.5 }}
-          end={{ x: 1, y: 0.5 }}
-          style={styles.gradient}
-        />
-      </Animated.View>
-
-      {/* Center Icon Glow (Subtle) */}
-      <View style={styles.indicatorContainer}>
-        <View style={styles.indicatorPulse} />
+      {/* Pulsing skeleton blocks */}
+      <View style={styles.content}>
+        <Animated.View style={[styles.skelBlock, { opacity }]} />
+        <Animated.View style={[styles.skelBlock, styles.skelBlockMed, { opacity, marginTop: 20 }]} />
+        <Animated.View style={[styles.skelBlock, { opacity, marginTop: 20 }]} />
       </View>
     </View>
   );
@@ -67,24 +56,20 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: '#050505',
   },
-  shimmerContainer: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  gradient: {
+  content: {
     flex: 1,
-    width: '100%',
-  },
-  indicatorContainer: {
-    flex: 1,
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
   },
-  indicatorPulse: {
-    width: 60,
+  skelBlock: {
+    width: '100%',
     height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(255,255,255,0.02)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  skelBlockMed: {
+    width: '75%',
+    height: 48,
   },
 });
