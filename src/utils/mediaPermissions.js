@@ -65,7 +65,7 @@ export async function ensureMediaPermission({ forceRequest = false } = {}) {
         return 'denied';
       }
     }
-    
+
     // User previously denied (canAskAgain is false) - return 'denied'
     await cachePermission('denied');
     return 'denied';
