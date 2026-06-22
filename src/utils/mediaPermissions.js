@@ -41,33 +41,34 @@ export async function ensureMediaPermission({ forceRequest = false } = {}) {
     // Ask native for current state first to check if we've never asked before (undetermined)
     const native = await MediaLibrary.getPermissionsAsync();
 
-    // If never asked before (undetermined) and not forceRequest, we should still prompt
-    const shouldForceRequest = native.status === 'undetermined' && !forceRequest;
-
     if (native.status === 'granted') {
       await cachePermission('granted');
       return 'granted';
     }
 
-    // If we shouldn't prompt, return the current native status
-    if (!shouldForceRequest && !native.canAskAgain) {
-      // Cache the status for future reads
-      await cachePermission(native.status || 'denied');
-      return native.status || 'denied';
+    // If permission was explicitly denied and we can't ask again, return 'denied'
+    if (native.status === 'denied' || (!native.canAskAgain && native.status === 'denied')) {
+      await cachePermission('denied');
+      return 'denied';
     }
 
-    // We are allowed to ask — either forceRequest was true, canAskAgain is true, or it's first time (undetermined)
-    try {
-      const requested = await MediaLibrary.requestPermissionsAsync();
-      const final = requested.status || native.status || 'denied';
-      await cachePermission(final);
-      return final;
-    } catch (e) {
-      console.warn('Failed to request media permission:', e);
-      // fallback to native.status
-      await cachePermission(native.status || 'denied');
-      return native.status || 'denied';
+    // If never asked before (undetermined) or canAskAgain, prompt for permission
+    if (native.canAskAgain || native.status === 'undetermined') {
+      try {
+        const requested = await MediaLibrary.requestPermissionsAsync();
+        const final = requested.status || 'denied';
+        await cachePermission(final);
+        return final;
+      } catch (e) {
+        console.warn('Failed to request media permission:', e);
+        await cachePermission('denied');
+        return 'denied';
+      }
     }
+    
+    // User previously denied (canAskAgain is false) - return 'denied'
+    await cachePermission('denied');
+    return 'denied';
   } catch (e) {
     console.warn('ensureMediaPermission failed:', e);
     return 'denied';

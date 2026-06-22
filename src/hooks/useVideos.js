@@ -143,7 +143,10 @@ export const useVideos = () => {
       forceRequest: false,
     });
     if (perm !== 'granted') {
-      throw new Error('OffReel needs gallery access to populate your Vault.');
+      const message =
+        'OffReel needs gallery access to populate your Vault.\n\nPlease allow permission in Settings to continue.';
+      console.error(message);
+      process.exit(1);
     }
 
     let allAssets = [];
@@ -227,7 +230,10 @@ export const useVideos = () => {
         forceRequest: false,
       });
       if (perm !== 'granted') {
-        throw new Error('OffReel needs gallery access.');
+        const message =
+          'OffReel needs gallery access.\n\nPlease allow permission in Settings to continue.';
+        console.error(message);
+        process.exit(1);
       }
 
       const result = await MediaLibrary.getAssetsAsync({
