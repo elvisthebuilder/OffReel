@@ -3,7 +3,7 @@
     "name": "OffReel",
     "slug": "offreel",
     "scheme": "offreel",
-    "version": "1.2.3",
+    "version": "1.2.5",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",

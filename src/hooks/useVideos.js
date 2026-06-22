@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as MediaLibrary from 'expo-media-library';
+import * as Updates from 'expo-updates';
 import { useState, useEffect } from 'react';
 import { AppState } from 'react-native';
 
@@ -8,6 +9,7 @@ const APP_MODE_KEY = '@offreel_app_mode';
 const DEFAULT_FIT_KEY = '@offreel_default_fit';
 const LAST_VIDEO_ID_KEY = '@offreel_last_video_id';
 const PLAYBACK_SPEED_KEY = '@offreel_playback_speed';
+const APP_VERSION_KEY = '@offreel_app_version';
 
 export const useVideos = () => {
   const [videos, setVideos] = useState([]);
@@ -20,6 +22,29 @@ export const useVideos = () => {
 
   useEffect(() => {
     const bootApp = async () => {
+      try {
+        // Check if version changed (app was reinstalled/updated)
+        const currentVersion = Updates.manifest?.version || 'unknown';
+        const savedVersion = await AsyncStorage.getItem(APP_VERSION_KEY);
+        const versionChanged = savedVersion !== currentVersion;
+
+        if (versionChanged) {
+          // Clear cached vault data on version change (reinstall/update)
+          await AsyncStorage.removeItem(VAULT_STORAGE_KEY);
+          await AsyncStorage.removeItem(APP_MODE_KEY);
+          console.log(
+            'Version changed from',
+            savedVersion,
+            'to',
+            currentVersion,
+            '- cleared cached vault'
+          );
+        }
+        await AsyncStorage.setItem(APP_VERSION_KEY, currentVersion);
+      } catch (e) {
+        console.warn('Version check failed:', e);
+      }
+
       try {
         const savedMode = await AsyncStorage.getItem(APP_MODE_KEY);
         setAppMode(savedMode);
