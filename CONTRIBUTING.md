@@ -47,13 +47,13 @@ See the [Pull Request Process](#pull-request-process) section below.
 
 ### Prerequisites
 
-| Tool                       | Minimum Version                   |
-| :------------------------- | :-------------------------------- |
-| Node.js                    | 18.x                              |
-| pnpm                       | 8.x                               |
-| Expo CLI                   | Latest via `pnpm dlx`             |
-| EAS CLI                    | Latest (`pnpm add -g eas-cli`)    |
-| Android device or emulator | API 26+ (Android 8.0+)            |
+| Tool                       | Minimum Version                |
+| :------------------------- | :----------------------------- |
+| Node.js                    | 18.x                           |
+| pnpm                       | 8.x                            |
+| Expo CLI                   | Latest via `pnpm dlx`          |
+| EAS CLI                    | Latest (`pnpm add -g eas-cli`) |
+| Android device or emulator | API 26+ (Android 8.0+)         |
 
 ### Getting Started
 
