@@ -38,25 +38,25 @@ export async function getNativePermission() {
 // Ensure we have permission; will only prompt when forceRequest === true or when native canAskAgain is true
 export async function ensureMediaPermission({ forceRequest = false } = {}) {
   try {
-    // Prefer cached value
-    const cached = await readCachedPermission();
-    if (cached === 'granted' && !forceRequest) return 'granted';
-
-    // Ask native for current state
+    // Ask native for current state first to check if we've never asked before (undetermined)
     const native = await MediaLibrary.getPermissionsAsync();
+
+    // If never asked before (undetermined) and not forceRequest, we should still prompt
+    const shouldForceRequest = native.status === 'undetermined' && !forceRequest;
+
     if (native.status === 'granted') {
       await cachePermission('granted');
       return 'granted';
     }
 
     // If we shouldn't prompt, return the current native status
-    if (!forceRequest && !native.canAskAgain) {
+    if (!shouldForceRequest && !native.canAskAgain) {
       // Cache the status for future reads
       await cachePermission(native.status || 'denied');
       return native.status || 'denied';
     }
 
-    // We are allowed to ask — either forceRequest was true or canAskAgain is true
+    // We are allowed to ask — either forceRequest was true, canAskAgain is true, or it's first time (undetermined)
     try {
       const requested = await MediaLibrary.requestPermissionsAsync();
       const final = requested.status || native.status || 'denied';
