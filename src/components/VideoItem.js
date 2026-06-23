@@ -160,7 +160,6 @@ function ActiveVideoItem({
   // PROGRESS BAR: Seekable via tap and drag (PanResponder)
   // ============================================================
   const progressBarRef = useRef(null);
-  const progressBarWidth = useRef(SCREEN_WIDTH);
 
   const seekToPosition = useCallback(
     (pageX) => {

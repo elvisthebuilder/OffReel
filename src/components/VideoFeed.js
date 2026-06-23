@@ -1,5 +1,4 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as MediaLibrary from 'expo-media-library';
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { FlatList, StyleSheet, Dimensions, View } from 'react-native';
 
@@ -116,7 +115,6 @@ export default function VideoFeed({
       defaultFit,
       favorites,
       toggleFavorite,
-      videos,
       playbackSpeed,
       onLongPressStateChange,
     ]

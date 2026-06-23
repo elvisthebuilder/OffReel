@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as FileSystem from 'expo-file-system';
+import { cacheDirectory, readDirectoryAsync, deleteAsync } from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import * as Updates from 'expo-updates';
 import { useState, useEffect } from 'react';
@@ -26,12 +26,11 @@ export const useVideos = () => {
       // Purge stale media cache on every cold start to prevent storage bloat
       // from expo-video / ExoPlayer decoded frame buffers
       try {
-        const cacheDir = FileSystem.cacheDirectory;
-        if (cacheDir) {
-          const cacheContents = await FileSystem.readDirectoryAsync(cacheDir);
+        if (cacheDirectory) {
+          const cacheContents = await readDirectoryAsync(cacheDirectory);
           await Promise.all(
             cacheContents.map((item) =>
-              FileSystem.deleteAsync(`${cacheDir}${item}`, { idempotent: true }).catch(() => {})
+              deleteAsync(`${cacheDirectory}${item}`, { idempotent: true }).catch(() => {})
             )
           );
           console.log(`Cleared ${cacheContents.length} cached items on boot`);

@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
 import * as MediaLibrary from 'expo-media-library';
 import React, { useState, useEffect } from 'react';
 import {
@@ -15,12 +14,10 @@ import {
   ToastAndroid,
   Alert,
   ScrollView,
-  StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AlbumChips from '../components/AlbumChips';
-import VaultSkeleton from '../components/VaultSkeleton';
 import VideoFeed from '../components/VideoFeed';
 import { useVideos } from '../hooks/useVideos';
 import { ensureMediaPermission, getNativePermission } from '../utils/mediaPermissions';
