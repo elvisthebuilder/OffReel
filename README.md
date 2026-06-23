@@ -1,7 +1,7 @@
 # OffReel — Immersive Offline Video Vault & Feed
 
 [![OffReel Website](https://img.shields.io/badge/Official_Website-offreel.vercel.app-000000?style=for-the-badge&logo=google-chrome&logoColor=white)](https://offreel.vercel.app/)
-[![Latest Release](https://img.shields.io/badge/Download_Latest-v1.2.3-34C759?style=for-the-badge&logo=android&logoColor=white)](https://github.com/elvisthebuilder/OffReel/releases)
+[![Latest Release](https://img.shields.io/badge/Download_Latest-v1.2.5-34C759?style=for-the-badge&logo=android&logoColor=white)](https://github.com/elvisthebuilder/OffReel/releases)
 [![Discord Server](https://img.shields.io/badge/Join_Discord-Community-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/5QYH4xaS)
 
 **OffReel** is a beautiful, offline-first mobile app that turns your phone's local video gallery into a dynamic, zero-latency vertical feed. Experience your own personal videos with the same fluid, continuous swipe mechanics as modern social platforms—**with 100% privacy, zero algorithms, and zero ads.**
@@ -12,8 +12,9 @@
 
 - **Vertical Reels-Style Feed:** Swipe up or down to scroll chronologically through your video gallery in a smooth, continuous vertical layout.
 - **Absolute Privacy & 100% Offline:** No accounts, no login, and no internet required. Your private personal videos never leave the glass of your phone.
+- **Immersive Gestures:** Long-press anywhere on the screen to instantly pause the video and hide all UI overlays for a distraction-free "clean" view. Long-press on the right edge to fast-forward.
 - **Double-Tap to Favorite:** Love a memory? Quickly double-tap anywhere on the screen to add it to your favorites with a beautiful physical vibration (haptics) and a cinematic heart burst effect.
-- **Aspect Ratio Control:** Switch instantly between **Fill Frame (Cover)** to immerse yourself in the action, or **Original View (Contain)** to see the full format. Tap the floating icon on paused videos or change it in settings.
+- **Aspect Ratio Control:** Switch instantly between **Fill Frame (Cover)** to immerse yourself in the action, or **Original View (Contain)** to see the full format. Tap the floating icon on paused videos or change it in the full-screen settings modal.
 - **Flexible Synchronization Engines:**
   - _Live OS Gallery (Auto-Sync):_ Automatically scan and sync new videos from your device's camera roll seamlessly in the background.
   - _Custom Vault (Manual Mode):_ Handpick exactly which videos you want to include in your OffReel feed through a secure grid with built-in selection locks.
@@ -46,8 +47,11 @@ OffReel features highly intuitive gestures and a simple settings hub designed to
 | **Swipe Up / Down**       | Seamlessly navigates to the next or previous video in your vault.                               |
 | **Single Tap**            | Pauses or resumes playback. While paused, a play icon overlay will appear.                      |
 | **Double Tap**            | Favorites the active video, triggering a physical haptic pulse and heart explosion.             |
+| **Long Press (Left/Center)** | Pauses the video and hides all UI elements for an immersive view. Resumes on release.        |
+| **Long Press (Right Edge)**| Fast-forwards the video playback. Normal speed resumes on release.                              |
+| **Progress Bar**          | Tap or drag the progress bar at the bottom to seek and scrub through the video.                 |
 | **Pill Menu (Bottom)**    | Tap **Heart** to favorite, **Paper Plane** to share, and **Ellipsis (...)** to view file names. |
-| **Gear Icon (Top Right)** | Opens the Vault Settings sheet.                                                                 |
+| **Gear Icon (Top Right)** | Opens the full-screen Vault Settings dashboard.                                                 |
 
 ### Vault Settings Overview
 
@@ -66,7 +70,7 @@ Open settings by tapping the gear icon at the top right of your screen:
 - **Want to add more manual videos?**
   If you're using **Custom Vault** mode, you'll see a white **+** button under the gear icon on the top right. Tap it to select new videos from your device.
 - **How do I clear my cache?**
-  Open settings, scroll to the bottom, and tap **"Reset & Wipe Global Vault"** to safely purge all stored metadata. Your physical video files in your phone's gallery will **never** be deleted.
+  OffReel automatically runs a silent media cache purge on every cold boot to prevent temporary frame buffers from bloating your device storage. If you want to clear your saved vault metadata, open settings, scroll to the bottom, and tap **"Reset & Wipe Global Vault"**. Your physical video files in your phone's gallery will **never** be deleted.
 
 ---
 
