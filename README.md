@@ -42,16 +42,16 @@ OffReel is currently distributed as a standalone, zero-bloat Android package (.A
 
 OffReel features highly intuitive gestures and a simple settings hub designed to keep you in complete control:
 
-| Gesture / Action          | Action Performed                                                                                |
-| :------------------------ | :---------------------------------------------------------------------------------------------- |
-| **Swipe Up / Down**       | Seamlessly navigates to the next or previous video in your vault.                               |
-| **Single Tap**            | Pauses or resumes playback. While paused, a play icon overlay will appear.                      |
-| **Double Tap**            | Favorites the active video, triggering a physical haptic pulse and heart explosion.             |
-| **Long Press (Left/Center)** | Pauses the video and hides all UI elements for an immersive view. Resumes on release.        |
-| **Long Press (Right Edge)**| Fast-forwards the video playback. Normal speed resumes on release.                              |
-| **Progress Bar**          | Tap or drag the progress bar at the bottom to seek and scrub through the video.                 |
-| **Pill Menu (Bottom)**    | Tap **Heart** to favorite, **Paper Plane** to share, and **Ellipsis (...)** to view file names. |
-| **Gear Icon (Top Right)** | Opens the full-screen Vault Settings dashboard.                                                 |
+| Gesture / Action             | Action Performed                                                                                |
+| :--------------------------- | :---------------------------------------------------------------------------------------------- |
+| **Swipe Up / Down**          | Seamlessly navigates to the next or previous video in your vault.                               |
+| **Single Tap**               | Pauses or resumes playback. While paused, a play icon overlay will appear.                      |
+| **Double Tap**               | Favorites the active video, triggering a physical haptic pulse and heart explosion.             |
+| **Long Press (Left/Center)** | Pauses the video and hides all UI elements for an immersive view. Resumes on release.           |
+| **Long Press (Right Edge)**  | Fast-forwards the video playback. Normal speed resumes on release.                              |
+| **Progress Bar**             | Tap or drag the progress bar at the bottom to seek and scrub through the video.                 |
+| **Pill Menu (Bottom)**       | Tap **Heart** to favorite, **Paper Plane** to share, and **Ellipsis (...)** to view file names. |
+| **Gear Icon (Top Right)**    | Opens the full-screen Vault Settings dashboard.                                                 |
 
 ### Vault Settings Overview
 
