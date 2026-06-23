@@ -47,13 +47,18 @@ export async function ensureMediaPermission({ forceRequest = false } = {}) {
     }
 
     // If permission was explicitly denied and we can't ask again, return 'denied'
-    if (native.status === 'denied' || (!native.canAskAgain && native.status === 'denied')) {
+    if (!forceRequest && !native.canAskAgain && native.status === 'denied') {
       await cachePermission('denied');
       return 'denied';
     }
 
-    // If never asked before (undetermined) or canAskAgain, prompt for permission
-    if (native.canAskAgain || native.status === 'undetermined') {
+    // If never asked before (undetermined) or canAskAgain, or forceRequest is true, prompt for permission
+    if (
+      forceRequest ||
+      native.canAskAgain ||
+      native.status === 'undetermined' ||
+      native.status === 'denied'
+    ) {
       try {
         const requested = await MediaLibrary.requestPermissionsAsync();
         const final = requested.status || 'denied';

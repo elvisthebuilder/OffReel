@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
+import * as MediaLibrary from 'expo-media-library';
 import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
@@ -12,12 +13,17 @@ import {
   Image,
   Linking,
   ToastAndroid,
+  Alert,
+  ScrollView,
+  StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import AlbumChips from '../components/AlbumChips';
 import VaultSkeleton from '../components/VaultSkeleton';
 import VideoFeed from '../components/VideoFeed';
 import { useVideos } from '../hooks/useVideos';
+import { ensureMediaPermission, getNativePermission } from '../utils/mediaPermissions';
 
 export default function HomeScreen() {
   const {
@@ -43,6 +49,65 @@ export default function HomeScreen() {
   const [galleryPool, setGalleryPool] = useState([]);
   const [selectedVideos, setSelectedVideos] = useState(new Set());
   const [syncStatus, setSyncStatus] = useState('Synchronizing Vault...');
+  const [galleryPermissionStatus, setGalleryPermissionStatus] = useState('undetermined');
+  const [isLongPressing, setIsLongPressing] = useState(false);
+
+  // Album filtering state hoisted to Home
+  const [selectedAlbumId, setSelectedAlbumId] = useState(null);
+  const [filteredVideos, setFilteredVideos] = useState(videos);
+
+  useEffect(() => {
+    if (!selectedAlbumId) {
+      setFilteredVideos(videos);
+    } else {
+      const vaultIds = new Set(videos.map((v) => v.id));
+      setFilteredVideos((prev) => prev.filter((v) => vaultIds.has(v.id)));
+    }
+  }, [videos, selectedAlbumId]);
+
+  const handleAlbumSelect = async (albumId) => {
+    if (!albumId) {
+      setSelectedAlbumId(null);
+      setFilteredVideos(videos);
+      return;
+    }
+    setSelectedAlbumId(albumId);
+    try {
+      // Need to import MediaLibrary at top
+      const MediaLibrary = require('expo-media-library');
+      const res = await MediaLibrary.getAssetsAsync({
+        album: albumId,
+        mediaType: MediaLibrary.MediaType.video,
+        first: 1000,
+      });
+      const mapped = res.assets.map((a) => ({
+        id: a.id,
+        uri: a.uri,
+        filename: a.filename,
+      }));
+      const vaultIds = new Set(videos.map((v) => v.id));
+      const filtered = mapped.filter((v) => vaultIds.has(v.id));
+      setFilteredVideos(filtered);
+    } catch (e) {
+      console.error('Failed to load assets for album filter:', e);
+    }
+  };
+
+  useEffect(() => {
+    const checkAndPromptPermission = async () => {
+      if (appMode === null || videos.length === 0) {
+        const current = await getNativePermission();
+        if (current === 'granted') {
+          setGalleryPermissionStatus('granted');
+        } else {
+          // Actively prompt instantly so user doesn't get stuck
+          const requested = await ensureMediaPermission({ forceRequest: true });
+          setGalleryPermissionStatus(requested);
+        }
+      }
+    };
+    checkAndPromptPermission();
+  }, [appMode, videos.length]);
 
   // Pagination states for native gallery selection
   const [hasNextPage, setHasNextPage] = useState(false);
@@ -124,16 +189,14 @@ export default function HomeScreen() {
   if (loading && !isPickerVisible) {
     return (
       <View style={[styles.centered, { backgroundColor: '#000' }]}>
-        <VaultSkeleton />
-        <View style={styles.syncOverlay}>
-          <Text
-            style={[
-              styles.text,
-              { fontSize: 11, letterSpacing: 3, opacity: 0.5, fontWeight: '800' },
-            ]}>
-            {syncStatus.toUpperCase()}
-          </Text>
-        </View>
+        <ActivityIndicator size="large" color="#fff" />
+        <Text
+          style={[
+            styles.text,
+            { fontSize: 13, letterSpacing: 3, opacity: 0.7, fontWeight: '600', marginTop: 24 },
+          ]}>
+          {syncStatus.toUpperCase()}
+        </Text>
       </View>
     );
   }
@@ -165,14 +228,48 @@ export default function HomeScreen() {
 
         {/* Visual step-by-step guide */}
         <View style={styles.stepsContainer}>
-          <View style={styles.step}>
-            <View style={styles.stepNumber}>
-              <Text style={styles.stepNumberText}>1</Text>
-            </View>
-            <Text style={styles.stepLabel}>Grant Gallery Access</Text>
-          </View>
+          <TouchableOpacity
+            style={[styles.step, galleryPermissionStatus === 'granted' && { opacity: 0.5 }]}
+            onPress={async () => {
+              const perm = await ensureMediaPermission({ forceRequest: true });
+              setGalleryPermissionStatus(perm);
 
-          <View style={[styles.step, { opacity: 0.6 }]}>
+              if (perm !== 'granted') {
+                const native = await MediaLibrary.getPermissionsAsync();
+                // Only show the Settings alert if the OS blocks the native popup (canAskAgain is false)
+                if (!native.canAskAgain) {
+                  Alert.alert(
+                    'Permission Required',
+                    'The OS has blocked permission requests. Please allow gallery access in Settings to continue.',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Settings', onPress: () => Linking.openSettings() },
+                    ]
+                  );
+                }
+              }
+            }}>
+            <View
+              style={[
+                styles.stepNumber,
+                galleryPermissionStatus === 'granted' && { backgroundColor: '#4cd964' },
+              ]}>
+              {galleryPermissionStatus === 'granted' ? (
+                <Ionicons name="checkmark" size={16} color="#000" />
+              ) : (
+                <Text style={styles.stepNumberText}>1</Text>
+              )}
+            </View>
+            <Text
+              style={[
+                styles.stepLabel,
+                galleryPermissionStatus === 'granted' && { color: '#4cd964' },
+              ]}>
+              Grant Gallery Access
+            </Text>
+          </TouchableOpacity>
+
+          <View style={[styles.step, { opacity: galleryPermissionStatus === 'granted' ? 1 : 0.4 }]}>
             <View style={styles.stepNumber}>
               <Text style={styles.stepNumberText}>2</Text>
             </View>
@@ -187,12 +284,16 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        <TouchableOpacity style={styles.buttonMain} onPress={autoScanGallery}>
+        <TouchableOpacity
+          style={[styles.buttonMain, galleryPermissionStatus !== 'granted' && { opacity: 0.5 }]}
+          onPress={galleryPermissionStatus === 'granted' ? autoScanGallery : null}>
           <Ionicons name="sync" size={20} color="#000" style={{ marginRight: 8 }} />
           <Text style={styles.buttonMainText}>Live Auto-Sync OS Gallery</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.buttonOutline} onPress={handleManualPath}>
+        <TouchableOpacity
+          style={[styles.buttonOutline, galleryPermissionStatus !== 'granted' && { opacity: 0.5 }]}
+          onPress={galleryPermissionStatus === 'granted' ? handleManualPath : null}>
           <Ionicons name="folder-open-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
           <Text style={styles.buttonOutlineText}>Custom Select Manually</Text>
         </TouchableOpacity>
@@ -281,54 +382,59 @@ export default function HomeScreen() {
     <View style={styles.container}>
       {/* Passing global settings layout efficiently beneath to structure raw render configs */}
       <VideoFeed
-        videos={videos}
+        videos={filteredVideos}
         defaultFit={defaultFit}
         initialVideoId={initialVideoId}
         playbackSpeed={playbackSpeed}
         onVideoDeleted={deleteVideo}
+        onLongPressStateChange={setIsLongPressing}
       />
 
-      <SafeAreaView style={styles.header} edges={['top']} pointerEvents="none">
-        <Text style={styles.headerText}>OffReel</Text>
-      </SafeAreaView>
+      {!isLongPressing && (
+        <>
+          <SafeAreaView style={styles.header} edges={['top']} pointerEvents="none">
+            <Text style={styles.headerText}>OffReel</Text>
+          </SafeAreaView>
 
-      <SafeAreaView style={styles.addMoreContainer} edges={['top']}>
-        {/* Only enable + appending organically firmly within Custom Manual Modes */}
-        {appMode === 'manual' && (
-          <TouchableOpacity style={styles.addMoreButton} onPress={handleManualPath}>
-            <Ionicons name="add" size={24} color="#fff" />
-          </TouchableOpacity>
-        )}
+          <View style={{ position: 'absolute', top: 90, zIndex: 10, width: '100%' }}>
+            <AlbumChips selectedAlbumId={selectedAlbumId} onSelect={handleAlbumSelect} />
+          </View>
 
-        {/* Securely triggering transparent structural overlays instead of wiping active array */}
-        <TouchableOpacity
-          style={[styles.addMoreButton, { marginTop: appMode === 'manual' ? 15 : 0 }]}
-          onPress={() => setIsSettingsVisible(true)}>
-          <Ionicons name="settings-outline" size={20} color="rgba(255,255,255,0.7)" />
-        </TouchableOpacity>
-      </SafeAreaView>
+          <SafeAreaView style={styles.addMoreContainer} edges={['top']}>
+            {appMode === 'manual' && (
+              <TouchableOpacity style={styles.addMoreButton} onPress={handleManualPath}>
+                <Ionicons name="add" size={24} color="#fff" />
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={[styles.addMoreButton, { marginTop: appMode === 'manual' ? 15 : 0 }]}
+              onPress={() => setIsSettingsVisible(true)}>
+              <Ionicons name="settings-outline" size={20} color="rgba(255,255,255,0.7)" />
+            </TouchableOpacity>
+          </SafeAreaView>
+        </>
+      )}
 
       {/* Picker Modal Integration */}
       {renderPickerModal()}
 
-      {/* Settings Modal Framework Overlaid securely on active Z-Axis exclusively */}
-      <Modal visible={isSettingsVisible} transparent animationType="slide">
-        <TouchableOpacity
-          style={styles.modalBackdrop}
-          activeOpacity={1}
-          onPress={() => setIsSettingsVisible(false)}>
-          <TouchableOpacity activeOpacity={1} style={{ width: '100%' }} onPress={() => {}}>
-            <BlurView intensity={65} tint="dark" style={styles.modalContent}>
-              <View style={styles.dragHandle} />
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Vault Settings</Text>
-                <TouchableOpacity
-                  style={styles.closeButton}
-                  onPress={() => setIsSettingsVisible(false)}>
-                  <Ionicons name="close" size={20} color="#888" />
-                </TouchableOpacity>
-              </View>
+      {/* Settings — Full Screen */}
+      <Modal visible={isSettingsVisible} transparent={false} animationType="slide">
+        <View style={styles.settingsScreen}>
+          <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right', 'bottom']}>
+            <View style={styles.settingsHeader}>
+              <Text style={styles.modalTitle}>Vault Settings</Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setIsSettingsVisible(false)}>
+                <Ionicons name="close" size={24} color="#888" />
+              </TouchableOpacity>
+            </View>
 
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={{ padding: 24, paddingTop: 0 }}
+              showsVerticalScrollIndicator={false}>
               <View style={styles.modalSection}>
                 <Text style={styles.sectionLabel}>DISPLAY RATIO</Text>
                 <View style={styles.toggleContainer}>
@@ -524,14 +630,19 @@ export default function HomeScreen() {
 
               <View style={styles.modalSection}>
                 <Text style={styles.sectionLabel}>DANGER ZONE</Text>
-                <TouchableOpacity style={styles.resetButton} onPress={handleReset}>
-                  <Ionicons name="trash-outline" size={16} color="#ff3b30" />
-                  <Text style={styles.resetButtonText}>Reset & Wipe Global Vault</Text>
+                <TouchableOpacity style={styles.actionRowDanger} onPress={handleReset}>
+                  <View style={[styles.iconCircle, { backgroundColor: 'rgba(255,59,48,0.1)' }]}>
+                    <Ionicons name="trash-outline" size={20} color="#ff3b30" />
+                  </View>
+                  <View>
+                    <Text style={[styles.actionLabel, { color: '#ff3b30' }]}>Wipe Vault Data</Text>
+                    <Text style={styles.actionDesc}>Clear storage & start fresh.</Text>
+                  </View>
                 </TouchableOpacity>
               </View>
-            </BlurView>
-          </TouchableOpacity>
-        </TouchableOpacity>
+            </ScrollView>
+          </SafeAreaView>
+        </View>
       </Modal>
     </View>
   );
@@ -702,6 +813,19 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: 20,
     marginTop: -10,
+  },
+  settingsScreen: {
+    flex: 1,
+    backgroundColor: '#050505',
+  },
+  settingsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
   },
   modalHeader: {
     flexDirection: 'row',

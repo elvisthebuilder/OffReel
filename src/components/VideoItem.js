@@ -1,10 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { useEffect, useState, useRef } from 'react';
-import { StyleSheet, View, Pressable, Text, TouchableOpacity, Animated } from 'react-native';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import {
+  StyleSheet,
+  View,
+  Pressable,
+  Text,
+  TouchableOpacity,
+  Animated,
+  PanResponder,
+  Dimensions,
+} from 'react-native';
 
-import AlbumChips from './AlbumChips';
+const SCREEN_WIDTH = Dimensions.get('window').width;
 
 function ActiveVideoItem({
   asset,
@@ -13,19 +22,22 @@ function ActiveVideoItem({
   isLiked,
   onDoubleTapLike,
   onReady,
-  onAlbumSelect,
-  selectedAlbumId,
   playbackSpeed,
+  onLongPressStateChange,
 }) {
   const [contentFit, setContentFit] = useState(defaultFit);
   const [isPausedByUser, setIsPausedByUser] = useState(false);
-  const [isFullscreenMode, setIsFullscreenMode] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isFastForwarding, setIsFastForwarding] = useState(false);
+  const [isLongPressing, setIsLongPressing] = useState(false);
+  const [isSeeking, setIsSeeking] = useState(false);
   const videoOpacity = useRef(new Animated.Value(0)).current;
   const progressInterval = useRef(null);
   const fastForwardInterval = useRef(null);
+  const longPressTimer = useRef(null);
+  const isLongPressActive = useRef(false);
+  const wasPlayingBeforeLongPress = useRef(false);
 
   const player = useVideoPlayer(asset.uri, (p) => {
     p.loop = true;
@@ -56,20 +68,21 @@ function ActiveVideoItem({
 
     return () => subscription.remove();
   });
+
   const [heartPos, setHeartPos] = useState({ x: 0, y: 0 });
 
   // Animated values for the double-tap heart burst
   const heartScale = useRef(new Animated.Value(0)).current;
   const heartOpacity = useRef(new Animated.Value(0)).current;
   const lastTap = useRef(null);
-  const longPressTimer = useRef(null);
   const DOUBLE_TAP_DELAY = 300;
-  const LONG_PRESS_DURATION = 500;
+  const LONG_PRESS_DURATION = 400;
 
+  // Progress tracking
   useEffect(() => {
-    if (isActive && !isPausedByUser) {
+    if (isActive && !isPausedByUser && !isLongPressing) {
       progressInterval.current = setInterval(() => {
-        if (player) {
+        if (player && !isSeeking) {
           setCurrentTime(player.currentTime || 0);
         }
       }, 100);
@@ -77,50 +90,120 @@ function ActiveVideoItem({
         if (progressInterval.current) clearInterval(progressInterval.current);
       };
     }
-  }, [isActive, isPausedByUser, player]);
+  }, [isActive, isPausedByUser, isLongPressing, player, isSeeking]);
 
   useEffect(() => {
     return () => {
       if (longPressTimer.current) clearTimeout(longPressTimer.current);
       if (progressInterval.current) clearInterval(progressInterval.current);
+      if (fastForwardInterval.current) clearInterval(fastForwardInterval.current);
     };
   }, []);
 
+  // ============================================================
+  // GESTURE: PressIn / PressOut for long press + fast forward
+  // ============================================================
   const handlePressIn = (e) => {
-    const { locationX, width } = e.nativeEvent;
-    const isRightSide = locationX > width * 0.75;
+    const { locationX } = e.nativeEvent;
+    const isRightSide = locationX > SCREEN_WIDTH * 0.75;
 
     if (isRightSide && player.playing) {
-      // Right-side press while playing — start fast-forwarding
+      // RIGHT SIDE: Fast-forward
       setIsFastForwarding(true);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       fastForwardInterval.current = setInterval(() => {
         if (player && player.currentTime !== undefined) {
-          player.currentTime = Math.min(player.currentTime + playbackSpeed * 0.5, duration);
+          const newTime = Math.min(player.currentTime + playbackSpeed * 0.5, duration);
+          player.currentTime = newTime;
+          setCurrentTime(newTime);
         }
       }, 100);
     } else {
-      // Left/center press — long press for fullscreen
+      // LEFT/CENTER: Long press to pause + hide UI (Instagram style)
       longPressTimer.current = setTimeout(() => {
-        setIsFullscreenMode(true);
+        isLongPressActive.current = true;
+        wasPlayingBeforeLongPress.current = player.playing;
+        setIsLongPressing(true);
         player.pause();
-        setIsPausedByUser(true);
+        onLongPressStateChange?.(true);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       }, LONG_PRESS_DURATION);
     }
   };
 
   const handlePressOut = () => {
+    // Cancel pending long press
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
     }
+
+    // Release fast-forward
     if (fastForwardInterval.current) {
       clearInterval(fastForwardInterval.current);
       fastForwardInterval.current = null;
       setIsFastForwarding(false);
     }
+
+    // Release long press — resume video and show UI
+    if (isLongPressActive.current) {
+      isLongPressActive.current = false;
+      setIsLongPressing(false);
+      onLongPressStateChange?.(false);
+      if (wasPlayingBeforeLongPress.current) {
+        player.play();
+      }
+    }
   };
+
+  // ============================================================
+  // PROGRESS BAR: Seekable via tap and drag (PanResponder)
+  // ============================================================
+  const progressBarRef = useRef(null);
+  const progressBarWidth = useRef(SCREEN_WIDTH);
+
+  const seekToPosition = useCallback(
+    (pageX) => {
+      if (duration <= 0) return;
+      progressBarRef.current?.measure((x, y, w, h, px) => {
+        const relativeX = Math.max(0, Math.min(pageX - px, w));
+        const seekTime = (relativeX / w) * duration;
+        player.currentTime = seekTime;
+        setCurrentTime(seekTime);
+      });
+    },
+    [duration, player]
+  );
+
+  const progressPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (e) => {
+        setIsSeeking(true);
+        if (player.playing) {
+          player.pause();
+        }
+        seekToPosition(e.nativeEvent.pageX);
+      },
+      onPanResponderMove: (e) => {
+        seekToPosition(e.nativeEvent.pageX);
+      },
+      onPanResponderRelease: (e) => {
+        seekToPosition(e.nativeEvent.pageX);
+        setIsSeeking(false);
+        if (!isPausedByUser) {
+          player.play();
+        }
+      },
+      onPanResponderTerminate: () => {
+        setIsSeeking(false);
+        if (!isPausedByUser) {
+          player.play();
+        }
+      },
+    })
+  ).current;
 
   const burstHeart = (x, y) => {
     setHeartPos({ x, y });
@@ -145,6 +228,9 @@ function ActiveVideoItem({
   };
 
   const handleTap = (e) => {
+    // Don't process taps if we just finished a long press
+    if (isLongPressActive.current) return;
+
     const now = Date.now();
     const { locationX, locationY } = e.nativeEvent;
 
@@ -177,92 +263,73 @@ function ActiveVideoItem({
     setContentFit((prev) => (prev === 'cover' ? 'contain' : 'cover'));
   };
 
+  const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
+
   return (
     <View style={styles.videoContainer}>
-      {isFullscreenMode ? (
-        // Fullscreen clean mode (Instagram Reels style)
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={() => setIsFullscreenMode(false)}
-          onLongPress={handlePressIn}
-          onPressOut={handlePressOut}>
-          <Animated.View style={[styles.video, { opacity: videoOpacity }]}>
-            <VideoView
-              style={styles.video}
-              player={player}
-              showsControls={false}
-              nativeControls={false}
-              contentFit={contentFit}
-            />
-          </Animated.View>
-          <Text style={styles.fullscreenExitHint}>Tap to exit fullscreen</Text>
-        </Pressable>
-      ) : (
-        <>
-          <Animated.View style={[styles.video, { opacity: videoOpacity }]}>
-            <VideoView
-              style={styles.video}
-              player={player}
-              showsControls={false}
-              nativeControls={false}
-              contentFit={contentFit}
-            />
-          </Animated.View>
+      <Animated.View style={[styles.video, { opacity: videoOpacity }]}>
+        <VideoView
+          style={styles.video}
+          player={player}
+          showsControls={false}
+          nativeControls={false}
+          contentFit={contentFit}
+        />
+      </Animated.View>
 
-          {/* Progress bar */}
-          <View style={styles.progressContainer}>
-            <View
-              style={[
-                styles.progressBar,
-                { width: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%' },
-              ]}
-            />
+      {/* Seekable progress bar — always visible, interactive hit area */}
+      <View
+        ref={progressBarRef}
+        style={styles.progressHitArea}
+        {...progressPanResponder.panHandlers}>
+        <View style={styles.progressContainer}>
+          <View style={[styles.progressBar, { width: `${progressPercent}%` }]} />
+          {/* Seek thumb — visible when seeking or paused */}
+          {(isSeeking || isPausedByUser) && (
+            <View style={[styles.seekThumb, { left: `${progressPercent}%`, marginLeft: -6 }]} />
+          )}
+        </View>
+      </View>
+
+      {/* Full-screen tap handler — single = pause, double = like, long press = hide UI */}
+      <Pressable
+        style={StyleSheet.absoluteFill}
+        onPress={handleTap}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}>
+        {isFastForwarding && (
+          <View style={styles.fastForwardIndicator} pointerEvents="none">
+            <Text style={styles.fastForwardText}>{playbackSpeed}x &gt;&gt;</Text>
           </View>
+        )}
+        {isPausedByUser && isActive && !isLongPressing && (
+          <View style={styles.pauseOverlay}>
+            <Text style={styles.playIcon}>▶</Text>
+            <TouchableOpacity style={styles.fitToggle} onPress={toggleFit} activeOpacity={0.7}>
+              <Ionicons
+                name={contentFit === 'cover' ? 'scan-outline' : 'expand-outline'}
+                size={18}
+                color="#fff"
+              />
+            </TouchableOpacity>
+          </View>
+        )}
+      </Pressable>
 
-          {/* Full-screen tap handler — single = pause, double = like, long press = fullscreen */}
-          <Pressable
-            style={StyleSheet.absoluteFill}
-            onPress={handleTap}
-            onLongPress={handlePressIn}
-            onPressOut={handlePressOut}>
-            {isFastForwarding && (
-              <View style={styles.fastForwardIndicator} pointerEvents="none">
-                <Text style={styles.fastForwardText}>{playbackSpeed}x &gt;&gt;</Text>
-              </View>
-            )}
-            {isPausedByUser && isActive && (
-              <View style={styles.pauseOverlay}>
-                <Text style={styles.playIcon}>▶</Text>
-                <TouchableOpacity style={styles.fitToggle} onPress={toggleFit} activeOpacity={0.7}>
-                  <Ionicons
-                    name={contentFit === 'cover' ? 'scan-outline' : 'expand-outline'}
-                    size={18}
-                    color="#fff"
-                  />
-                </TouchableOpacity>
-
-                {/* Album filter chips appear at the top when paused */}
-                <AlbumChips selectedAlbumId={selectedAlbumId} onSelect={onAlbumSelect} />
-              </View>
-            )}
-          </Pressable>
-
-          {/* Floating heart burst on double-tap */}
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.heartBurst,
-              {
-                left: heartPos.x - 45,
-                top: heartPos.y - 45,
-                opacity: heartOpacity,
-                transform: [{ scale: heartScale }],
-              },
-            ]}>
-            <Ionicons name="heart" size={90} color="#ff2b54" />
-          </Animated.View>
-        </>
-      )}
+      {/* Floating heart burst on double-tap */}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.heartBurst,
+          {
+            left: heartPos.x - 45,
+            top: heartPos.y - 45,
+            opacity: heartOpacity,
+            transform: [{ scale: heartScale }],
+          },
+        ]}>
+        <Ionicons name="heart" size={90} color="#ff2b54" />
+      </Animated.View>
     </View>
   );
 }
@@ -297,8 +364,8 @@ export default function VideoItem({
   defaultFit,
   isLiked,
   onDoubleTapLike,
-  onAlbumSelect,
-  selectedAlbumId,
+  playbackSpeed,
+  onLongPressStateChange,
 }) {
   const [isPlayerReady, setIsPlayerReady] = useState(false);
   const posterOpacity = useRef(new Animated.Value(1)).current;
@@ -341,8 +408,8 @@ export default function VideoItem({
             isLiked={isLiked}
             onDoubleTapLike={onDoubleTapLike}
             onReady={() => setIsPlayerReady(true)}
-            onAlbumSelect={onAlbumSelect}
-            selectedAlbumId={selectedAlbumId}
+            playbackSpeed={playbackSpeed}
+            onLongPressStateChange={onLongPressStateChange}
           />
         </View>
       ) : isVisible ? (
@@ -431,34 +498,37 @@ const styles = StyleSheet.create({
     zIndex: 200,
     pointerEvents: 'none',
   },
-  likedBadge: {
-    position: 'absolute',
-    bottom: 80,
-    left: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  progressContainer: {
+  // Seekable progress bar
+  progressHitArea: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
+    height: 20, // Large hit area for easy tapping/dragging
+    justifyContent: 'flex-end',
+    zIndex: 300,
+  },
+  progressContainer: {
+    width: '100%',
     height: 3,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    zIndex: 150,
+    backgroundColor: 'rgba(255,255,255,0.15)',
   },
   progressBar: {
     height: '100%',
-    backgroundColor: '#ff3b30',
+    backgroundColor: '#fff',
   },
-  fullscreenExitHint: {
+  seekThumb: {
     position: 'absolute',
-    bottom: 30,
-    alignSelf: 'center',
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 14,
-    fontWeight: '500',
+    top: -4,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 3,
   },
   fastForwardIndicator: {
     position: 'absolute',

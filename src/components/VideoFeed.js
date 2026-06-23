@@ -16,15 +16,13 @@ export default function VideoFeed({
   initialVideoId,
   playbackSpeed,
   onVideoDeleted,
+  onLongPressStateChange,
 }) {
   const flatListRef = useRef(null);
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
   const [feedHeight, setFeedHeight] = useState(height);
   const [favorites, setFavorites] = useState(new Set());
-
-  // Album filter state: null = all
-  const [selectedAlbumId, setSelectedAlbumId] = useState(null);
-  const [filteredVideos, setFilteredVideos] = useState(videos);
+  const [isLongPressing, setIsLongPressing] = useState(false);
 
   // Track if we've stabilized at our starting position
   const [isReadyForSaving, setIsReadyForSaving] = useState(false);
@@ -32,11 +30,11 @@ export default function VideoFeed({
   // PRE-CALCULATE STARTING INDEX: This is the most robust way to resume.
   // We determine the index BEFORE the FlatList mounts.
   const startingIndex = useMemo(() => {
-    const source = filteredVideos || videos;
+    const source = videos;
     if (!initialVideoId || source.length === 0) return 0;
     const idx = source.findIndex((v) => v.id === initialVideoId);
     return idx >= 0 ? idx : 0;
-  }, [filteredVideos, videos, initialVideoId]);
+  }, [videos, initialVideoId]);
 
   // Synchronize the active index state with our calculated starting index on mount
   useEffect(() => {
@@ -104,37 +102,11 @@ export default function VideoFeed({
           defaultFit={defaultFit}
           isLiked={favorites.has(item.id)}
           onDoubleTapLike={() => toggleFavorite(item.id)}
-          // album filtering controls (rendered when paused inside VideoItem)
-          onAlbumSelect={async (albumId) => {
-            if (!albumId) {
-              setSelectedAlbumId(null);
-              setFilteredVideos(videos);
-              return;
-            }
-
-            setSelectedAlbumId(albumId);
-
-            try {
-              const res = await MediaLibrary.getAssetsAsync({
-                album: albumId,
-                mediaType: MediaLibrary.MediaType.video,
-                first: 1000,
-              });
-              // Map to same shape used by the vault (id, uri, filename)
-              const mapped = res.assets.map((a) => ({
-                id: a.id,
-                uri: a.uri,
-                filename: a.filename,
-              }));
-              setFilteredVideos(mapped);
-              // Reset position to top of filtered feed
-              setActiveVideoIndex(0);
-            } catch (e) {
-              console.error('Failed to load assets for album filter:', e);
-            }
-          }}
-          selectedAlbumId={selectedAlbumId}
           playbackSpeed={playbackSpeed}
+          onLongPressStateChange={(pressing) => {
+            setIsLongPressing(pressing);
+            onLongPressStateChange?.(pressing);
+          }}
         />
       );
     },
@@ -146,7 +118,7 @@ export default function VideoFeed({
       toggleFavorite,
       videos,
       playbackSpeed,
-      selectedAlbumId,
+      onLongPressStateChange,
     ]
   );
 
@@ -157,15 +129,13 @@ export default function VideoFeed({
     }
   }, []);
 
-  // Select source videos (either filtered by album or all)
-  const sourceVideos = selectedAlbumId ? filteredVideos : videos;
-  if (!sourceVideos || sourceVideos.length === 0) return <VaultSkeleton />;
+  if (!videos || videos.length === 0) return <VaultSkeleton />;
 
   return (
     <View style={styles.container} onLayout={onFeedLayout}>
       <FlatList
         ref={flatListRef}
-        data={sourceVideos}
+        data={videos}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         pagingEnabled
@@ -192,17 +162,16 @@ export default function VideoFeed({
         }}
       />
 
-      <FloatingPill
-        activeAsset={sourceVideos[activeVideoIndex]}
-        favorites={favorites}
-        onToggleFavorite={toggleFavorite}
-        onDeleteVideo={(videoId) => {
-          if (selectedAlbumId) {
-            setFilteredVideos((prev) => prev.filter((v) => v.id !== videoId));
-          }
-          onVideoDeleted?.(videoId);
-        }}
-      />
+      {!isLongPressing && (
+        <FloatingPill
+          activeAsset={videos[activeVideoIndex]}
+          favorites={favorites}
+          onToggleFavorite={toggleFavorite}
+          onDeleteVideo={(videoId) => {
+            onVideoDeleted?.(videoId);
+          }}
+        />
+      )}
     </View>
   );
 }

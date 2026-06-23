@@ -103,12 +103,8 @@ export default function AlbumChips({ selectedAlbumId, onSelect }) {
 
 const styles = StyleSheet.create({
   container: {
-    position: 'absolute',
-    top: 40,
-    left: 0,
-    right: 0,
-    zIndex: 300,
     paddingHorizontal: 12,
+    marginVertical: 10,
   },
   row: {
     alignItems: 'center',
@@ -129,5 +125,5 @@ const styles = StyleSheet.create({
   },
   text: { color: '#ddd', fontSize: 13, fontWeight: '600' },
   textActive: { color: '#000' },
-  loaderRow: { position: 'absolute', top: 40, left: 0, right: 0, alignItems: 'center' },
+  loaderRow: { paddingHorizontal: 12, marginVertical: 10, alignItems: 'center' },
 });
